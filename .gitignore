@@ -1,13 +1,22 @@
 .env
+.env.*
+!.env.example
 .venv/
 venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
 
+node_modules/
+.next/
+out/
+dist/
+coverage/
+
 # Saídas e bases com dados reais de leads
 output/*
 !output/.gitkeep
+apps/**/output/*
 *.xlsx
 *.xls
 *.csv

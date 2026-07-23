@@ -1,0 +1,58 @@
+import type { Lead } from "@/lib/types";
+
+type LeadsTableProps = {
+  leads: Lead[];
+};
+
+export function LeadsTable({ leads }: LeadsTableProps) {
+  if (!leads.length) {
+    return (
+      <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center shadow-soft">
+        <p className="text-lg font-bold text-slate-900">Nenhum lead carregado ainda</p>
+        <p className="mt-2 text-sm text-slate-600">
+          Quando o Neon DB estiver conectado e a base for importada, os leads aparecerão aqui.
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-3xl bg-white shadow-soft ring-1 ring-black/5">
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-slate-200 text-sm">
+          <thead className="bg-slate-950 text-left text-white">
+            <tr>
+              <th className="px-5 py-4 font-semibold">Empresa</th>
+              <th className="px-5 py-4 font-semibold">Cidade</th>
+              <th className="px-5 py-4 font-semibold">Segmento</th>
+              <th className="px-5 py-4 font-semibold">Score</th>
+              <th className="px-5 py-4 font-semibold">Classificação</th>
+              <th className="px-5 py-4 font-semibold">WhatsApp</th>
+              <th className="px-5 py-4 font-semibold">Contato</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {leads.map((lead, index) => (
+              <tr key={lead.id ?? `${lead.nome}-${index}`} className="hover:bg-yellow-50/60">
+                <td className="px-5 py-4">
+                  <p className="font-bold text-slate-950">{lead.nome}</p>
+                  <p className="text-xs text-slate-500">{lead.telefone ?? "Sem telefone"}</p>
+                </td>
+                <td className="px-5 py-4 text-slate-700">{lead.cidade ?? "-"}</td>
+                <td className="px-5 py-4 text-slate-700">{lead.segmento ?? "-"}</td>
+                <td className="px-5 py-4 font-bold">{lead.score_oportunidade ?? "-"}</td>
+                <td className="px-5 py-4">
+                  <span className="rounded-full bg-yellow-100 px-3 py-1 text-xs font-bold text-yellow-900">
+                    {lead.classificacao_lead ?? "Sem classificação"}
+                  </span>
+                </td>
+                <td className="px-5 py-4 text-slate-700">{lead.whatsapp_status ?? "-"}</td>
+                <td className="px-5 py-4 text-slate-700">{lead.status_contato ?? "Novo"}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

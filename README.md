@@ -14,6 +14,102 @@ O projeto usa apenas API oficial do Google. Não faz scraping do Google Maps.
 - Gera uma planilha de abordagem manual via WhatsApp para empresas sem site.
 - Cria mensagens prontas e links `wa.me`, mas não envia mensagens automaticamente.
 
+## Estrutura atual do repositório
+
+```text
+robot-lead-management/
+├─ apps/
+│  ├─ api/                  # API Python/FastAPI preparada para Neon DB
+│  └─ web/                  # Dashboard Next.js/React/Tailwind
+├─ robot_lead_management/   # Motor Python de leads já existente
+├─ data/                    # Arquivos de exemplo
+├─ output/                  # Saídas locais ignoradas pelo Git
+├─ architecture.md          # Arquitetura backend/frontend/Neon/Vercel
+└─ README.md
+```
+
+## Dashboard web e API
+
+A evolução do produto está documentada em `architecture.md`.
+
+Nesta primeira versão de aplicação web foram criadas duas pastas:
+
+- `apps/api`: backend HTTP em Python/FastAPI, com endpoints iniciais e conexão preparada para Neon DB.
+- `apps/web`: frontend em Next.js, React e Tailwind, pronto para ser publicado na Vercel.
+
+### Rodar a API localmente
+
+```powershell
+cd apps\api
+python -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+copy .env.example .env
+notepad .env
+.\.venv\Scripts\python.exe -m uvicorn app.main:app --reload --port 8000
+```
+
+Teste:
+
+```text
+http://localhost:8000/health
+```
+
+### Rodar o dashboard localmente
+
+Em outro PowerShell:
+
+```powershell
+cd apps\web
+npm install
+copy .env.example .env.local
+npm run dev
+```
+
+Acesse:
+
+```text
+http://localhost:3000
+```
+
+### Neon DB
+
+O banco será Postgres no Neon. A API espera a variável:
+
+```text
+DATABASE_URL=postgresql://USUARIO:SENHA@HOST.neon.tech/NOME_DO_BANCO?sslmode=require
+```
+
+O schema inicial está em:
+
+```text
+apps/api/migrations/001_initial_schema.sql
+```
+
+### Vercel
+
+Publicaremos como dois projetos Vercel apontando para o mesmo repositório:
+
+| Projeto | Root directory | Função |
+| --- | --- | --- |
+| `robot-leads-api` | `apps/api` | Backend Python/FastAPI |
+| `robot-leads-web` | `apps/web` | Dashboard Next.js |
+
+Variáveis principais da API:
+
+```text
+DATABASE_URL
+GOOGLE_PLACES_API_KEY
+APP_ENV
+ALLOWED_ORIGINS
+```
+
+Variáveis principais do web:
+
+```text
+API_BASE_URL
+NEXT_PUBLIC_APP_URL
+```
+
 ## Instalação no Windows
 
 Abra o PowerShell na pasta do projeto e execute:
