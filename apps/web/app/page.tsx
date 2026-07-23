@@ -1,4 +1,5 @@
 import { LeadsTable } from "@/components/leads-table";
+import { RunSearchForm } from "@/components/run-search-form";
 import { StatCard } from "@/components/stat-card";
 import { getDashboardSummary, getLeads } from "@/lib/api";
 
@@ -66,7 +67,19 @@ export default async function HomePage() {
           <LeadsTable leads={leads.items} />
         </div>
 
-        <aside className="rounded-[2rem] bg-white p-6 shadow-soft ring-1 ring-black/5">
+        <aside className="flex flex-col gap-6">
+          <div className="rounded-[2rem] bg-white p-6 shadow-soft ring-1 ring-black/5">
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Coleta de leads</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">Buscar novos leads</h2>
+            <p className="mt-2 text-sm text-slate-500">
+              Busca empresas na Google Places API e salva direto no banco.
+            </p>
+            <div className="mt-5">
+              <RunSearchForm />
+            </div>
+          </div>
+
+          <div className="rounded-[2rem] bg-white p-6 shadow-soft ring-1 ring-black/5">
           <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Mensagem atual</p>
           <h2 className="mt-2 text-2xl font-black">Promoção Codepath</h2>
           <div className="mt-5 rounded-3xl bg-slate-950 p-5 text-white">
@@ -91,6 +104,7 @@ export default async function HomePage() {
           >
             Ver site promocional
           </a>
+          </div>
         </aside>
       </section>
     </main>

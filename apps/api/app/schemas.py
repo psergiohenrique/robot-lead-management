@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any
 
 from pydantic import BaseModel, Field
 
@@ -78,8 +77,25 @@ class SearchBatchCreate(BaseModel):
     limite: int = Field(default=100, ge=1, le=500)
 
 
-class SearchBatchResponse(BaseModel):
-    id: int | None = None
+class SearchBatchResult(BaseModel):
+    id: int
     status: str
+    total_encontrado: int
+    total_sem_site: int
+    novos_leads: int
+    leads_atualizados: int
     message: str
-    payload: dict[str, Any]
+
+
+class SearchBatchSummary(BaseModel):
+    id: int
+    nome_lote: str | None = None
+    status: str
+    prioridade: str | None = None
+    cidade: str | None = None
+    segmento: str | None = None
+    total_leads: int | None = None
+    total_sem_site: int | None = None
+    erro: str | None = None
+    created_at: datetime
+    finished_at: datetime | None = None

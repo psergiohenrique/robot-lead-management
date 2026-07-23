@@ -2,7 +2,9 @@ from __future__ import annotations
 
 from typing import Any
 
+from app.config import get_settings
 from app.db import database_configured, get_connection
+from app.places import buscar_lugares, montar_lead
 
 
 def get_dashboard_summary() -> dict[str, int]:
@@ -149,3 +151,163 @@ def get_lead(lead_id: int) -> dict[str, Any] | None:
             cursor.execute("SELECT * FROM leads WHERE id = %s", (lead_id,))
             row = cursor.fetchone()
             return dict(row) if row else None
+
+
+def _marcar_erro(batch_id: int, item_id: int, erro: str) -> None:
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE search_batches SET status = 'error', erro = %(erro)s, finished_at = now() WHERE id = %(id)s",
+                {"erro": erro, "id": batch_id},
+            )
+            cursor.execute(
+                "UPDATE search_batch_items SET status = 'error', erro = %(erro)s, finished_at = now() WHERE id = %(id)s",
+                {"erro": erro, "id": item_id},
+            )
+        connection.commit()
+
+
+def criar_e_executar_lote(
+    *, cidade: str, segmento: str, prioridade: str, limite: int, nome_lote: str | None
+) -> dict[str, Any]:
+    if not database_configured():
+        raise RuntimeError("DATABASE_URL não configurada.")
+
+    settings = get_settings()
+    api_key = (settings.google_places_api_key or "").strip()
+    if not api_key:
+        raise RuntimeError("GOOGLE_PLACES_API_KEY não configurada.")
+
+    query_base = f"{segmento} em {cidade}"
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO search_batches (nome_lote, status, prioridade, total_planejado, started_at)
+                VALUES (%(nome_lote)s, 'running', %(prioridade)s, %(limite)s, now())
+                RETURNING id
+                """,
+                {"nome_lote": nome_lote, "prioridade": prioridade, "limite": limite},
+            )
+            batch_id = cursor.fetchone()["id"]
+            cursor.execute(
+                """
+                INSERT INTO search_batch_items (batch_id, cidade, segmento, limite, query_base, status)
+                VALUES (%(batch_id)s, %(cidade)s, %(segmento)s, %(limite)s, %(query_base)s, 'running')
+                RETURNING id
+                """,
+                {
+                    "batch_id": batch_id,
+                    "cidade": cidade,
+                    "segmento": segmento,
+                    "limite": limite,
+                    "query_base": query_base,
+                },
+            )
+            item_id = cursor.fetchone()["id"]
+        connection.commit()
+
+    try:
+        lugares = buscar_lugares(api_key, query_base, limite)
+    except RuntimeError as erro:
+        _marcar_erro(batch_id, item_id, str(erro))
+        raise
+
+    leads = [
+        montar_lead(lugar, cidade=cidade, segmento=segmento, prioridade=prioridade)
+        for lugar in lugares
+        if lugar.get("id")
+    ]
+
+    novos = 0
+    atualizados = 0
+    sem_site = sum(1 for lead in leads if lead["sem_site_cadastrado"] == "SIM")
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            for lead in leads:
+                cursor.execute(
+                    """
+                    INSERT INTO leads (
+                        place_id, nome, telefone, telefone_limpo, whatsapp_status,
+                        endereco, cidade, segmento, google_maps_url, avaliacao,
+                        quantidade_avaliacoes, site_cadastrado, sem_site_cadastrado,
+                        business_status, score_oportunidade, classificacao_lead, prioridade
+                    ) VALUES (
+                        %(place_id)s, %(nome)s, %(telefone)s, %(telefone_limpo)s, %(whatsapp_status)s,
+                        %(endereco)s, %(cidade)s, %(segmento)s, %(google_maps_url)s, %(avaliacao)s,
+                        %(quantidade_avaliacoes)s, %(site_cadastrado)s, %(sem_site_cadastrado)s,
+                        %(business_status)s, %(score_oportunidade)s, %(classificacao_lead)s, %(prioridade)s
+                    )
+                    ON CONFLICT (place_id) DO UPDATE SET
+                        nome = EXCLUDED.nome,
+                        telefone = EXCLUDED.telefone,
+                        telefone_limpo = EXCLUDED.telefone_limpo,
+                        whatsapp_status = EXCLUDED.whatsapp_status,
+                        endereco = EXCLUDED.endereco,
+                        cidade = EXCLUDED.cidade,
+                        segmento = EXCLUDED.segmento,
+                        google_maps_url = EXCLUDED.google_maps_url,
+                        avaliacao = EXCLUDED.avaliacao,
+                        quantidade_avaliacoes = EXCLUDED.quantidade_avaliacoes,
+                        site_cadastrado = EXCLUDED.site_cadastrado,
+                        sem_site_cadastrado = EXCLUDED.sem_site_cadastrado,
+                        business_status = EXCLUDED.business_status,
+                        score_oportunidade = EXCLUDED.score_oportunidade,
+                        classificacao_lead = EXCLUDED.classificacao_lead,
+                        updated_at = now()
+                    RETURNING (xmax = 0) AS inserted
+                    """,
+                    lead,
+                )
+                row = cursor.fetchone()
+                if row and row["inserted"]:
+                    novos += 1
+                else:
+                    atualizados += 1
+
+            cursor.execute(
+                """
+                UPDATE search_batches
+                SET status = 'done', total_processado = %(total)s, total_leads = %(total)s,
+                    total_sem_site = %(sem_site)s, finished_at = now()
+                WHERE id = %(batch_id)s
+                """,
+                {"total": len(leads), "sem_site": sem_site, "batch_id": batch_id},
+            )
+            cursor.execute(
+                "UPDATE search_batch_items SET status = 'done', finished_at = now() WHERE id = %(item_id)s",
+                {"item_id": item_id},
+            )
+        connection.commit()
+
+    return {
+        "id": batch_id,
+        "status": "done",
+        "total_encontrado": len(leads),
+        "total_sem_site": sem_site,
+        "novos_leads": novos,
+        "leads_atualizados": atualizados,
+        "message": f"{len(leads)} empresa(s) encontrada(s), {sem_site} sem site cadastrado.",
+    }
+
+
+def list_search_batches(limit: int = 20) -> list[dict[str, Any]]:
+    if not database_configured():
+        return []
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT sb.id, sb.nome_lote, sb.status, sb.prioridade, sb.total_leads,
+                       sb.total_sem_site, sb.erro, sb.created_at, sb.finished_at,
+                       sbi.cidade, sbi.segmento
+                FROM search_batches sb
+                LEFT JOIN search_batch_items sbi ON sbi.batch_id = sb.id
+                ORDER BY sb.created_at DESC
+                LIMIT %(limit)s
+                """,
+                {"limit": limit},
+            )
+            return [dict(row) for row in cursor.fetchall()]

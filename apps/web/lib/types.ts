@@ -37,3 +37,13 @@ export type LeadListResponse = {
   offset: number;
   database_configured: boolean;
 };
+
+export type SearchBatchResult = {
+  id: number;
+  status: string;
+  total_encontrado: number;
+  total_sem_site: number;
+  novos_leads: number;
+  leads_atualizados: number;
+  message: string;
+};
