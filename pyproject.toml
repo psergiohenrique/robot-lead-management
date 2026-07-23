@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "robot-lead-management"
+version = "0.1.0"
+description = "Aplicação Python para geração, organização e abordagem manual de leads usando Google Places API."
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "requests>=2.32,<3",
+    "python-dotenv>=1.0,<2",
+    "openpyxl>=3.1,<4",
+]
+
+[project.scripts]
+robot-leads = "robot_lead_management.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["robot_lead_management*"]

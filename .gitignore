@@ -1,0 +1,22 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Saídas e bases com dados reais de leads
+output/*
+!output/.gitkeep
+*.xlsx
+*.xls
+*.csv
+!data/*.example.csv
+*.inspect.ndjson
+~$*.xlsx
+
+# Arquivos locais do sistema/editor
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
