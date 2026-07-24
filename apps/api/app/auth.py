@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
@@ -12,6 +13,8 @@ from app.config import get_settings
 from app.db import database_configured, get_connection
 
 RESEND_API_URL = "https://api.resend.com/emails"
+
+logger = logging.getLogger("app.auth")
 
 
 def _hash_token(token: str) -> str:
@@ -36,7 +39,7 @@ def _send_magic_link_email(email: str, link: str) -> None:
     if not settings.resend_api_key:
         return
     try:
-        requests.post(
+        response = requests.post(
             RESEND_API_URL,
             headers={
                 "Authorization": f"Bearer {settings.resend_api_key}",
@@ -54,8 +57,10 @@ def _send_magic_link_email(email: str, link: str) -> None:
             },
             timeout=10,
         )
+        if not response.ok:
+            logger.error("Falha ao enviar magic link via Resend para %s: %s %s", email, response.status_code, response.text)
     except requests.RequestException:
-        pass
+        logger.exception("Erro de conexão ao enviar magic link via Resend para %s", email)
 
 
 def request_magic_link(email: str) -> str | None:
