@@ -45,6 +45,31 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   return apiGet<DashboardSummary>("/dashboard/summary", emptySummary);
 }
 
-export async function getLeads(): Promise<LeadListResponse> {
-  return apiGet<LeadListResponse>("/leads?limit=12&sem_site=SIM", emptyLeads);
+type LeadQuery = {
+  limit?: number;
+  offset?: number;
+  cidade?: string;
+  segmento?: string;
+  classificacao?: string;
+  sem_site?: string;
+};
+
+export async function getLeads(query: LeadQuery = {}): Promise<LeadListResponse> {
+  const params = new URLSearchParams();
+  const limit = query.limit ?? 12;
+  const offset = query.offset ?? 0;
+
+  params.set("limit", String(limit));
+  params.set("offset", String(offset));
+
+  if (query.cidade) params.set("cidade", query.cidade);
+  if (query.segmento) params.set("segmento", query.segmento);
+  if (query.classificacao) params.set("classificacao", query.classificacao);
+  if (query.sem_site) params.set("sem_site", query.sem_site);
+
+  return apiGet<LeadListResponse>(`/leads?${params.toString()}`, {
+    ...emptyLeads,
+    limit,
+    offset,
+  });
 }

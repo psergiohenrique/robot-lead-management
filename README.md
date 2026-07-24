@@ -71,6 +71,16 @@ Acesse:
 http://localhost:3000
 ```
 
+Na listagem de leads do dashboard, cada lead com telefone válido mostra o botão **Abrir WhatsApp**. Esse botão cria um link `wa.me` com:
+
+- telefone do próprio lead;
+- mensagem promocional da Codepath já preenchida;
+- personalização por cidade e segmento quando esses dados existirem.
+
+O envio continua manual: o usuário abre o WhatsApp, revisa a conversa e confirma o envio.
+
+A tabela também possui filtros por cidade, segmento, classificação e situação do site, além de paginação por URL.
+
 ### Neon DB
 
 O banco será Postgres no Neon. A API espera a variável:
