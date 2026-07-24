@@ -103,9 +103,24 @@ def list_leads(
     if batch_id:
         from_clause = """
             leads l
-            INNER JOIN search_batch_leads sbl ON sbl.lead_id = l.id
+            LEFT JOIN search_batch_leads sbl
+                ON sbl.lead_id = l.id
+                AND sbl.batch_id = %(batch_id)s
         """
-        filters.append("sbl.batch_id = %(batch_id)s")
+        filters.append(
+            """
+            (
+                sbl.batch_id IS NOT NULL
+                OR EXISTS (
+                    SELECT 1
+                    FROM search_batch_items sbi
+                    WHERE sbi.batch_id = %(batch_id)s
+                      AND lower(COALESCE(l.cidade, '')) = lower(COALESCE(sbi.cidade, ''))
+                      AND lower(COALESCE(l.segmento, '')) = lower(COALESCE(sbi.segmento, ''))
+                )
+            )
+            """
+        )
         params["batch_id"] = batch_id
 
     where = f"WHERE {' AND '.join(filters)}" if filters else ""
