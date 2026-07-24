@@ -48,3 +48,22 @@ export async function runSearchBatch(
     return { status: "error", message: "Não foi possível conectar à API." };
   }
 }
+
+export async function updateLeadStatus(formData: FormData): Promise<void> {
+  const leadId = String(formData.get("lead_id") ?? "").trim();
+  const statusContato = String(formData.get("status_contato") ?? "").trim();
+
+  if (!leadId || !statusContato) return;
+
+  try {
+    await fetch(`${API_BASE_URL}/leads/${leadId}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ status_contato: statusContato }),
+      cache: "no-store",
+    });
+    revalidatePath("/");
+  } catch {
+    // A tela continua funcionando mesmo se a API estiver offline.
+  }
+}

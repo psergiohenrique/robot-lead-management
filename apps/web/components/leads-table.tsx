@@ -1,4 +1,5 @@
 import type { Lead } from "@/lib/types";
+import { updateLeadStatus } from "@/lib/actions";
 import { criarLinkWhatsApp, limparTelefoneBrasil } from "@/lib/whatsapp";
 
 type LeadsTableProps = {
@@ -58,7 +59,32 @@ export function LeadsTable({ leads }: LeadsTableProps) {
                       {telefoneLimpo ? <span className="text-xs text-slate-400">{telefoneLimpo}</span> : null}
                     </div>
                   </td>
-                  <td className="px-5 py-4 text-slate-700">{lead.status_contato ?? "Novo"}</td>
+                  <td className="px-5 py-4">
+                    {lead.id ? (
+                      <form action={updateLeadStatus} className="flex min-w-40 gap-2">
+                        <input type="hidden" name="lead_id" value={lead.id} />
+                        <select
+                          className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100"
+                          name="status_contato"
+                          defaultValue={lead.status_contato ?? "Novo"}
+                        >
+                          <option value="Novo">Novo</option>
+                          <option value="Primeiro contato">Primeiro contato</option>
+                          <option value="Respondeu">Respondeu</option>
+                          <option value="Diagnóstico enviado">Diagnóstico enviado</option>
+                          <option value="Reunião marcada">Reunião marcada</option>
+                          <option value="Proposta">Proposta</option>
+                          <option value="Fechado">Fechado</option>
+                          <option value="Perdido">Perdido</option>
+                        </select>
+                        <button className="rounded-2xl bg-slate-950 px-3 py-2 text-xs font-black text-white transition hover:bg-slate-800">
+                          Salvar
+                        </button>
+                      </form>
+                    ) : (
+                      <span className="text-slate-700">{lead.status_contato ?? "Novo"}</span>
+                    )}
+                  </td>
                   <td className="px-5 py-4">
                     {whatsappLink ? (
                       <a

@@ -1,9 +1,10 @@
+import { LeadBaseTabs } from "@/components/lead-base-tabs";
 import { LeadsFilters } from "@/components/leads-filters";
 import { LeadsTable } from "@/components/leads-table";
 import { Pagination } from "@/components/pagination";
 import { RunSearchForm } from "@/components/run-search-form";
 import { StatCard } from "@/components/stat-card";
-import { getDashboardSummary, getLeads } from "@/lib/api";
+import { getDashboardSummary, getLeads, getSearchBatches } from "@/lib/api";
 
 const pipeline = [
   "Novo",
@@ -33,22 +34,39 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const params = (await searchParams) ?? {};
   const limit = Math.min(Math.max(paramNumber(params, "limit", 12), 1), 100);
   const offset = paramNumber(params, "offset", 0);
+  const rawBase = paramValue(params, "base") ?? "sem_site";
+  const base = ["sem_site", "todos", "pesquisa"].includes(rawBase) ? rawBase : "sem_site";
+  const batchId = paramValue(params, "batch_id");
   const cidade = paramValue(params, "cidade");
   const segmento = paramValue(params, "segmento");
   const classificacao = paramValue(params, "classificacao");
-  const semSite = paramValue(params, "sem_site") ?? "SIM";
+  const semSite = paramValue(params, "sem_site") ?? (base === "sem_site" ? "SIM" : undefined);
 
-  const [summary, leads] = await Promise.all([
-    getDashboardSummary(),
-    getLeads({
-      limit,
-      offset,
-      cidade,
-      segmento,
-      classificacao,
-      sem_site: semSite,
-    }),
-  ]);
+  const [summary, batches] = await Promise.all([getDashboardSummary(), getSearchBatches()]);
+  const selectedBatchId = base === "pesquisa" ? batchId ?? batches[0]?.id?.toString() : undefined;
+  const leads = await getLeads({
+    limit,
+    offset,
+    cidade,
+    segmento,
+    classificacao,
+    sem_site: semSite,
+    batch_id: selectedBatchId,
+  });
+
+  const currentBatch = batches.find((batch) => String(batch.id) === selectedBatchId);
+  const sectionTitle =
+    base === "todos"
+      ? "Todos os leads"
+      : base === "pesquisa"
+        ? `Pesquisa #${selectedBatchId ?? currentBatch?.id ?? "-"}`
+        : "Leads sem site";
+  const sectionHelper =
+    base === "pesquisa" && currentBatch
+      ? `${currentBatch.cidade ?? "Cidade não informada"} / ${currentBatch.segmento ?? "Segmento não informado"}`
+      : base === "todos"
+        ? "Base geral consolidada"
+        : "Primeira abordagem";
 
   return (
     <main className="mx-auto flex min-h-screen max-w-7xl flex-col gap-8 px-5 py-8 sm:px-8">
@@ -141,16 +159,25 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       </section>
 
       <section>
+        <LeadBaseTabs activeBase={base} activeBatchId={selectedBatchId} batches={batches} />
+
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Primeira abordagem</p>
-            <h2 className="mt-2 text-2xl font-black text-slate-950">Leads sem site</h2>
+            <p className="mt-6 text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">{sectionHelper}</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">{sectionTitle}</h2>
           </div>
           <p className="text-sm text-slate-500">{leads.total.toLocaleString("pt-BR")} registros</p>
         </div>
 
         <div className="flex flex-col gap-4">
-          <LeadsFilters cidade={cidade} segmento={segmento} classificacao={classificacao} semSite={semSite} />
+          <LeadsFilters
+            cidade={cidade}
+            segmento={segmento}
+            classificacao={classificacao}
+            semSite={semSite}
+            base={base}
+            batchId={selectedBatchId}
+          />
           <LeadsTable leads={leads.items} />
           <Pagination
             total={leads.total}
@@ -161,6 +188,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               segmento,
               classificacao,
               sem_site: semSite,
+              base,
+              batch_id: selectedBatchId,
             }}
           />
         </div>

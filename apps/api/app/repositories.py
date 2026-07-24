@@ -7,6 +7,31 @@ from app.db import database_configured, get_connection
 from app.places import buscar_lugares, montar_lead
 
 
+def ensure_search_batch_leads_table() -> None:
+    if not database_configured():
+        return
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS search_batch_leads (
+                    batch_id BIGINT NOT NULL REFERENCES search_batches(id) ON DELETE CASCADE,
+                    lead_id BIGINT NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    PRIMARY KEY (batch_id, lead_id)
+                )
+                """
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_search_batch_leads_lead_id ON search_batch_leads (lead_id)"
+            )
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_search_batch_leads_batch_id ON search_batch_leads (batch_id)"
+            )
+        connection.commit()
+
+
 def get_dashboard_summary() -> dict[str, int]:
     if not database_configured():
         return {
@@ -50,9 +75,13 @@ def list_leads(
     segmento: str | None = None,
     classificacao: str | None = None,
     sem_site: str | None = None,
+    batch_id: int | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     if not database_configured():
         return [], 0
+
+    if batch_id:
+        ensure_search_batch_leads_table()
 
     filters: list[str] = []
     params: dict[str, Any] = {"limit": limit, "offset": offset}
@@ -70,32 +99,41 @@ def list_leads(
         filters.append("sem_site_cadastrado = %(sem_site)s")
         params["sem_site"] = sem_site
 
+    from_clause = "leads l"
+    if batch_id:
+        from_clause = """
+            leads l
+            INNER JOIN search_batch_leads sbl ON sbl.lead_id = l.id
+        """
+        filters.append("sbl.batch_id = %(batch_id)s")
+        params["batch_id"] = batch_id
+
     where = f"WHERE {' AND '.join(filters)}" if filters else ""
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
-            cursor.execute(f"SELECT COUNT(*)::int AS total FROM leads {where}", params)
+            cursor.execute(f"SELECT COUNT(*)::int AS total FROM {from_clause} {where}", params)
             total = int((cursor.fetchone() or {"total": 0})["total"])
             cursor.execute(
                 f"""
                 SELECT
-                    id, place_id, nome, telefone, telefone_limpo, whatsapp_status,
-                    endereco, cidade, segmento, regiao, google_maps_url, avaliacao,
-                    quantidade_avaliacoes, site_cadastrado, sem_site_cadastrado,
-                    score_oportunidade, classificacao_lead, prioridade,
-                    status_contato, proximo_followup, updated_at
-                FROM leads
+                    l.id, l.place_id, l.nome, l.telefone, l.telefone_limpo, l.whatsapp_status,
+                    l.endereco, l.cidade, l.segmento, l.regiao, l.google_maps_url, l.avaliacao,
+                    l.quantidade_avaliacoes, l.site_cadastrado, l.sem_site_cadastrado,
+                    l.score_oportunidade, l.classificacao_lead, l.prioridade,
+                    l.status_contato, l.proximo_followup, l.updated_at
+                FROM {from_clause}
                 {where}
                 ORDER BY
-                    CASE classificacao_lead
+                    CASE l.classificacao_lead
                         WHEN 'Quente' THEN 1
                         WHEN 'Morno' THEN 2
                         WHEN 'Frio' THEN 3
                         ELSE 4
                     END,
-                    score_oportunidade DESC NULLS LAST,
-                    quantidade_avaliacoes DESC NULLS LAST,
-                    updated_at DESC NULLS LAST
+                    l.score_oportunidade DESC NULLS LAST,
+                    l.quantidade_avaliacoes DESC NULLS LAST,
+                    l.updated_at DESC NULLS LAST
                 LIMIT %(limit)s OFFSET %(offset)s
                 """,
                 params,
@@ -223,6 +261,7 @@ def criar_e_executar_lote(
     novos = 0
     atualizados = 0
     sem_site = sum(1 for lead in leads if lead["sem_site_cadastrado"] == "SIM")
+    ensure_search_batch_leads_table()
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
@@ -257,7 +296,7 @@ def criar_e_executar_lote(
                         score_oportunidade = EXCLUDED.score_oportunidade,
                         classificacao_lead = EXCLUDED.classificacao_lead,
                         updated_at = now()
-                    RETURNING (xmax = 0) AS inserted
+                    RETURNING id, (xmax = 0) AS inserted
                     """,
                     lead,
                 )
@@ -266,6 +305,15 @@ def criar_e_executar_lote(
                     novos += 1
                 else:
                     atualizados += 1
+                if row:
+                    cursor.execute(
+                        """
+                        INSERT INTO search_batch_leads (batch_id, lead_id)
+                        VALUES (%(batch_id)s, %(lead_id)s)
+                        ON CONFLICT (batch_id, lead_id) DO NOTHING
+                        """,
+                        {"batch_id": batch_id, "lead_id": row["id"]},
+                    )
 
             cursor.execute(
                 """

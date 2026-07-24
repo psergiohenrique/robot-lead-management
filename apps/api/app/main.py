@@ -64,6 +64,7 @@ def leads(
     segmento: str | None = None,
     classificacao: str | None = None,
     sem_site: str | None = None,
+    batch_id: int | None = Query(default=None, ge=1),
 ) -> LeadListResponse:
     items, total = list_leads(
         limit=limit,
@@ -72,6 +73,7 @@ def leads(
         segmento=segmento,
         classificacao=classificacao,
         sem_site=sem_site,
+        batch_id=batch_id,
     )
     return LeadListResponse(
         items=items,

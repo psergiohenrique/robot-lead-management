@@ -1,4 +1,4 @@
-import type { DashboardSummary, LeadListResponse } from "./types";
+import type { DashboardSummary, LeadListResponse, SearchBatchSummary } from "./types";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8000";
 
@@ -52,6 +52,7 @@ type LeadQuery = {
   segmento?: string;
   classificacao?: string;
   sem_site?: string;
+  batch_id?: string;
 };
 
 export async function getLeads(query: LeadQuery = {}): Promise<LeadListResponse> {
@@ -66,10 +67,15 @@ export async function getLeads(query: LeadQuery = {}): Promise<LeadListResponse>
   if (query.segmento) params.set("segmento", query.segmento);
   if (query.classificacao) params.set("classificacao", query.classificacao);
   if (query.sem_site) params.set("sem_site", query.sem_site);
+  if (query.batch_id) params.set("batch_id", query.batch_id);
 
   return apiGet<LeadListResponse>(`/leads?${params.toString()}`, {
     ...emptyLeads,
     limit,
     offset,
   });
+}
+
+export async function getSearchBatches(limit = 30): Promise<SearchBatchSummary[]> {
+  return apiGet<SearchBatchSummary[]>(`/search-batches?limit=${limit}`, []);
 }

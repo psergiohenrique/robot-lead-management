@@ -47,3 +47,17 @@ export type SearchBatchResult = {
   leads_atualizados: number;
   message: string;
 };
+
+export type SearchBatchSummary = {
+  id: number;
+  nome_lote?: string | null;
+  status: string;
+  prioridade?: string | null;
+  cidade?: string | null;
+  segmento?: string | null;
+  total_leads?: number | null;
+  total_sem_site?: number | null;
+  erro?: string | null;
+  created_at: string;
+  finished_at?: string | null;
+};

@@ -81,6 +81,33 @@ O envio continua manual: o usuário abre o WhatsApp, revisa a conversa e confirm
 
 A tabela também possui filtros por cidade, segmento, classificação e situação do site, além de paginação por URL.
 
+### Como navegar entre as bases de leads
+
+A dashboard trabalha com uma base única de leads e algumas visões para facilitar o trabalho comercial:
+
+- **Todos os leads**: mostra a base geral consolidada, com empresas com site e sem site.
+- **Sem site**: mostra apenas as empresas sem site cadastrado no Google. Esta é a principal fila para primeira abordagem comercial.
+- **Por pesquisa**: mostra os leads encontrados em uma busca anterior, por exemplo "dentista em Maringá" ou "clínica médica em Campinas".
+
+Na prática, quando uma nova pesquisa é feita:
+
+1. os leads entram ou são atualizados na base geral;
+2. se não tiverem site, também aparecem automaticamente na visão **Sem site**;
+3. a pesquisa fica registrada no histórico de lotes;
+4. os leads encontrados ficam ligados a essa pesquisa, sem duplicar o cadastro principal.
+
+O mais importante: o **status de contato fica salvo no lead**, não na tela. Então, se você marcar um lead como `Primeiro contato`, `Respondeu` ou `Reunião marcada`, esse status continua aparecendo quando você abrir a base geral, a lista sem site ou uma pesquisa antiga.
+
+Isso permite voltar dias depois em uma cidade/segmento já pesquisado e retomar exatamente de onde parou.
+
+Para guardar a ligação entre pesquisas e leads, existe a migration:
+
+```text
+apps/api/migrations/002_search_batch_leads.sql
+```
+
+A API também tenta criar essa tabela automaticamente quando necessário, para evitar trabalho manual durante o uso normal.
+
 ### Neon DB
 
 O banco será Postgres no Neon. A API espera a variável:
