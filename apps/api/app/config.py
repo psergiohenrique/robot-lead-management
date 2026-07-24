@@ -14,6 +14,11 @@ class Settings(BaseSettings):
     database_url: str | None = None
     google_places_api_key: str | None = None
     allowed_origins: str = "http://localhost:3000"
+    resend_api_key: str | None = None
+    email_from: str = "Robot Lead Management <onboarding@resend.dev>"
+    frontend_url: str = "http://localhost:3000"
+    magic_link_ttl_minutes: int = 15
+    session_ttl_days: int = 30
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

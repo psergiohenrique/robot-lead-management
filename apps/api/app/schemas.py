@@ -2,7 +2,30 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, EmailStr, Field
+
+
+class User(BaseModel):
+    id: int
+    email: str
+
+
+class MagicLinkRequest(BaseModel):
+    email: EmailStr
+
+
+class MagicLinkRequestResponse(BaseModel):
+    message: str
+    debug_link: str | None = None
+
+
+class MagicLinkVerify(BaseModel):
+    token: str
+
+
+class AuthSession(BaseModel):
+    session_token: str
+    user: User
 
 
 class HealthResponse(BaseModel):

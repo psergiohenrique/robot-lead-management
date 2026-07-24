@@ -1,8 +1,9 @@
 from __future__ import annotations
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.auth import get_current_user, request_magic_link, verify_magic_link
 from app.config import get_settings
 from app.db import database_configured
 from app.repositories import (
@@ -14,13 +15,18 @@ from app.repositories import (
     update_lead_contact,
 )
 from app.schemas import (
+    AuthSession,
     DashboardSummary,
     HealthResponse,
     LeadListResponse,
     LeadUpdate,
+    MagicLinkRequest,
+    MagicLinkRequestResponse,
+    MagicLinkVerify,
     SearchBatchCreate,
     SearchBatchResult,
     SearchBatchSummary,
+    User,
 )
 
 
@@ -51,9 +57,29 @@ def health() -> HealthResponse:
     )
 
 
+@app.post("/auth/request-link", response_model=MagicLinkRequestResponse)
+def auth_request_link(payload: MagicLinkRequest) -> MagicLinkRequestResponse:
+    debug_link = request_magic_link(payload.email)
+    return MagicLinkRequestResponse(
+        message="Se o email existir, um link de acesso foi enviado.",
+        debug_link=debug_link,
+    )
+
+
+@app.post("/auth/verify", response_model=AuthSession)
+def auth_verify(payload: MagicLinkVerify) -> AuthSession:
+    result = verify_magic_link(payload.token)
+    return AuthSession(**result)
+
+
+@app.get("/auth/me", response_model=User)
+def auth_me(current_user: dict = Depends(get_current_user)) -> User:
+    return User(**current_user)
+
+
 @app.get("/dashboard/summary", response_model=DashboardSummary)
-def dashboard_summary() -> DashboardSummary:
-    return DashboardSummary(**get_dashboard_summary())
+def dashboard_summary(current_user: dict = Depends(get_current_user)) -> DashboardSummary:
+    return DashboardSummary(**get_dashboard_summary(current_user["id"]))
 
 
 @app.get("/leads", response_model=LeadListResponse)
@@ -65,8 +91,10 @@ def leads(
     classificacao: str | None = None,
     sem_site: str | None = None,
     batch_id: int | None = Query(default=None, ge=1),
+    current_user: dict = Depends(get_current_user),
 ) -> LeadListResponse:
     items, total = list_leads(
+        user_id=current_user["id"],
         limit=limit,
         offset=offset,
         cidade=cidade,
@@ -85,25 +113,28 @@ def leads(
 
 
 @app.get("/leads/{lead_id}")
-def lead_detail(lead_id: int):
-    lead = get_lead(lead_id)
+def lead_detail(lead_id: int, current_user: dict = Depends(get_current_user)):
+    lead = get_lead(lead_id, current_user["id"])
     if not lead:
         raise HTTPException(status_code=404, detail="Lead não encontrado ou banco não configurado.")
     return lead
 
 
 @app.patch("/leads/{lead_id}")
-def update_lead(lead_id: int, payload: LeadUpdate):
-    updated = update_lead_contact(lead_id, payload.model_dump(exclude_unset=True))
+def update_lead(lead_id: int, payload: LeadUpdate, current_user: dict = Depends(get_current_user)):
+    updated = update_lead_contact(lead_id, current_user["id"], payload.model_dump(exclude_unset=True))
     if not updated:
         raise HTTPException(status_code=404, detail="Lead não encontrado ou banco não configurado.")
     return updated
 
 
 @app.post("/search-batches", response_model=SearchBatchResult, status_code=201)
-def create_search_batch(payload: SearchBatchCreate) -> SearchBatchResult:
+def create_search_batch(
+    payload: SearchBatchCreate, current_user: dict = Depends(get_current_user)
+) -> SearchBatchResult:
     try:
         resultado = criar_e_executar_lote(
+            user_id=current_user["id"],
             cidade=payload.cidade,
             segmento=payload.segmento,
             prioridade=payload.prioridade,
@@ -116,13 +147,17 @@ def create_search_batch(payload: SearchBatchCreate) -> SearchBatchResult:
 
 
 @app.get("/search-batches", response_model=list[SearchBatchSummary])
-def search_batches(limit: int = Query(default=20, ge=1, le=100)) -> list[dict]:
-    return list_search_batches(limit=limit)
+def search_batches(
+    limit: int = Query(default=20, ge=1, le=100), current_user: dict = Depends(get_current_user)
+) -> list[dict]:
+    return list_search_batches(current_user["id"], limit=limit)
 
 
 @app.get("/whatsapp/top-leads", response_model=LeadListResponse)
-def whatsapp_top_leads(limit: int = Query(default=50, ge=1, le=100)) -> LeadListResponse:
-    items, total = list_leads(limit=limit, offset=0, sem_site="SIM")
+def whatsapp_top_leads(
+    limit: int = Query(default=50, ge=1, le=100), current_user: dict = Depends(get_current_user)
+) -> LeadListResponse:
+    items, total = list_leads(user_id=current_user["id"], limit=limit, offset=0, sem_site="SIM")
     return LeadListResponse(
         items=items,
         total=total,

@@ -32,7 +32,7 @@ def ensure_search_batch_leads_table() -> None:
         connection.commit()
 
 
-def get_dashboard_summary() -> dict[str, int]:
+def get_dashboard_summary(user_id: int) -> dict[str, int]:
     if not database_configured():
         return {
             "total_leads": 0,
@@ -61,7 +61,9 @@ def get_dashboard_summary() -> dict[str, int]:
                     COUNT(*) FILTER (WHERE proposta_enviada = true)::int AS propostas_enviadas,
                     COUNT(*) FILTER (WHERE fechado = true)::int AS fechados
                 FROM leads
-                """
+                WHERE user_id = %(user_id)s
+                """,
+                {"user_id": user_id},
             )
             row = cursor.fetchone() or {}
             return dict(row)
@@ -69,6 +71,7 @@ def get_dashboard_summary() -> dict[str, int]:
 
 def list_leads(
     *,
+    user_id: int,
     limit: int = 50,
     offset: int = 0,
     cidade: str | None = None,
@@ -83,8 +86,8 @@ def list_leads(
     if batch_id:
         ensure_search_batch_leads_table()
 
-    filters: list[str] = []
-    params: dict[str, Any] = {"limit": limit, "offset": offset}
+    filters: list[str] = ["l.user_id = %(user_id)s"]
+    params: dict[str, Any] = {"limit": limit, "offset": offset, "user_id": user_id}
 
     if cidade:
         filters.append("cidade ILIKE %(cidade)s")
@@ -156,7 +159,7 @@ def list_leads(
             return [dict(row) for row in cursor.fetchall()], total
 
 
-def update_lead_contact(lead_id: int, payload: dict[str, Any]) -> dict[str, Any] | None:
+def update_lead_contact(lead_id: int, user_id: int, payload: dict[str, Any]) -> dict[str, Any] | None:
     if not database_configured():
         return None
 
@@ -174,10 +177,11 @@ def update_lead_contact(lead_id: int, payload: dict[str, Any]) -> dict[str, Any]
     }
     values = {key: value for key, value in payload.items() if key in allowed_fields and value is not None}
     if not values:
-        return get_lead(lead_id)
+        return get_lead(lead_id, user_id)
 
     assignments = ", ".join(f"{field} = %({field})s" for field in values)
     values["lead_id"] = lead_id
+    values["user_id"] = user_id
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
@@ -185,7 +189,7 @@ def update_lead_contact(lead_id: int, payload: dict[str, Any]) -> dict[str, Any]
                 f"""
                 UPDATE leads
                 SET {assignments}, updated_at = now()
-                WHERE id = %(lead_id)s
+                WHERE id = %(lead_id)s AND user_id = %(user_id)s
                 RETURNING *
                 """,
                 values,
@@ -195,13 +199,16 @@ def update_lead_contact(lead_id: int, payload: dict[str, Any]) -> dict[str, Any]
             return dict(row) if row else None
 
 
-def get_lead(lead_id: int) -> dict[str, Any] | None:
+def get_lead(lead_id: int, user_id: int) -> dict[str, Any] | None:
     if not database_configured():
         return None
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
-            cursor.execute("SELECT * FROM leads WHERE id = %s", (lead_id,))
+            cursor.execute(
+                "SELECT * FROM leads WHERE id = %(id)s AND user_id = %(user_id)s",
+                {"id": lead_id, "user_id": user_id},
+            )
             row = cursor.fetchone()
             return dict(row) if row else None
 
@@ -221,7 +228,7 @@ def _marcar_erro(batch_id: int, item_id: int, erro: str) -> None:
 
 
 def criar_e_executar_lote(
-    *, cidade: str, segmento: str, prioridade: str, limite: int, nome_lote: str | None
+    *, user_id: int, cidade: str, segmento: str, prioridade: str, limite: int, nome_lote: str | None
 ) -> dict[str, Any]:
     if not database_configured():
         raise RuntimeError("DATABASE_URL não configurada.")
@@ -237,11 +244,11 @@ def criar_e_executar_lote(
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO search_batches (nome_lote, status, prioridade, total_planejado, started_at)
-                VALUES (%(nome_lote)s, 'running', %(prioridade)s, %(limite)s, now())
+                INSERT INTO search_batches (user_id, nome_lote, status, prioridade, total_planejado, started_at)
+                VALUES (%(user_id)s, %(nome_lote)s, 'running', %(prioridade)s, %(limite)s, now())
                 RETURNING id
                 """,
-                {"nome_lote": nome_lote, "prioridade": prioridade, "limite": limite},
+                {"user_id": user_id, "nome_lote": nome_lote, "prioridade": prioridade, "limite": limite},
             )
             batch_id = cursor.fetchone()["id"]
             cursor.execute(
@@ -268,7 +275,7 @@ def criar_e_executar_lote(
         raise
 
     leads = [
-        montar_lead(lugar, cidade=cidade, segmento=segmento, prioridade=prioridade)
+        {**montar_lead(lugar, cidade=cidade, segmento=segmento, prioridade=prioridade), "user_id": user_id}
         for lugar in lugares
         if lugar.get("id")
     ]
@@ -284,17 +291,17 @@ def criar_e_executar_lote(
                 cursor.execute(
                     """
                     INSERT INTO leads (
-                        place_id, nome, telefone, telefone_limpo, whatsapp_status,
+                        user_id, place_id, nome, telefone, telefone_limpo, whatsapp_status,
                         endereco, cidade, segmento, google_maps_url, avaliacao,
                         quantidade_avaliacoes, site_cadastrado, sem_site_cadastrado,
                         business_status, score_oportunidade, classificacao_lead, prioridade
                     ) VALUES (
-                        %(place_id)s, %(nome)s, %(telefone)s, %(telefone_limpo)s, %(whatsapp_status)s,
+                        %(user_id)s, %(place_id)s, %(nome)s, %(telefone)s, %(telefone_limpo)s, %(whatsapp_status)s,
                         %(endereco)s, %(cidade)s, %(segmento)s, %(google_maps_url)s, %(avaliacao)s,
                         %(quantidade_avaliacoes)s, %(site_cadastrado)s, %(sem_site_cadastrado)s,
                         %(business_status)s, %(score_oportunidade)s, %(classificacao_lead)s, %(prioridade)s
                     )
-                    ON CONFLICT (place_id) DO UPDATE SET
+                    ON CONFLICT (user_id, place_id) DO UPDATE SET
                         nome = EXCLUDED.nome,
                         telefone = EXCLUDED.telefone,
                         telefone_limpo = EXCLUDED.telefone_limpo,
@@ -356,7 +363,7 @@ def criar_e_executar_lote(
     }
 
 
-def list_search_batches(limit: int = 20) -> list[dict[str, Any]]:
+def list_search_batches(user_id: int, limit: int = 20) -> list[dict[str, Any]]:
     if not database_configured():
         return []
     with get_connection() as connection:
@@ -368,9 +375,10 @@ def list_search_batches(limit: int = 20) -> list[dict[str, Any]]:
                        sbi.cidade, sbi.segmento
                 FROM search_batches sb
                 LEFT JOIN search_batch_items sbi ON sbi.batch_id = sb.id
+                WHERE sb.user_id = %(user_id)s
                 ORDER BY sb.created_at DESC
                 LIMIT %(limit)s
                 """,
-                {"limit": limit},
+                {"user_id": user_id, "limit": limit},
             )
             return [dict(row) for row in cursor.fetchall()]

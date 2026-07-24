@@ -1,3 +1,8 @@
+export type User = {
+  id: number;
+  email: string;
+};
+
 export type DashboardSummary = {
   total_leads: number;
   leads_sem_site: number;

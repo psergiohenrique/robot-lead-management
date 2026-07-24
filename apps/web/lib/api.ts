@@ -1,3 +1,4 @@
+import { getSessionToken } from "./auth";
 import type { DashboardSummary, LeadListResponse, SearchBatchSummary } from "./types";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8000";
@@ -23,11 +24,17 @@ const emptyLeads: LeadListResponse = {
 };
 
 async function apiGet<T>(path: string, fallback: T): Promise<T> {
+  const token = await getSessionToken();
+  if (!token) {
+    return fallback;
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}${path}`, {
-      next: { revalidate: 30 },
+      cache: "no-store",
       headers: {
         Accept: "application/json",
+        Authorization: `Bearer ${token}`,
       },
     });
 

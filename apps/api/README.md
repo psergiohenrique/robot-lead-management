@@ -21,3 +21,24 @@ APP_ENV=development
 ```
 
 Sem `DATABASE_URL`, a API sobe em modo seguro/local e retorna listas vazias em endpoints que dependem do banco.
+
+## Migrações
+
+Rode os arquivos de `migrations/` em ordem no seu Postgres (Neon):
+
+```bash
+psql "$DATABASE_URL" -f migrations/001_initial_schema.sql
+psql "$DATABASE_URL" -f migrations/002_auth.sql
+```
+
+## Autenticação
+
+Login é por magic link (email apenas, sem senha):
+
+1. `POST /auth/request-link {email}` cria/acha o usuário e envia um email com link via Resend.
+2. Usuário clica no link (`FRONTEND_URL/auth/verify?token=...`), que troca o token por uma sessão.
+3. `POST /auth/verify {token}` retorna `session_token`; endpoints protegidos exigem `Authorization: Bearer <session_token>`.
+
+Sem `RESEND_API_KEY` configurada e fora de produção (`APP_ENV != production`), `request-link` retorna o link em `debug_link` na resposta, para testar login local sem enviar email de verdade.
+
+Leads e lotes de busca são isolados por usuário (`user_id`).

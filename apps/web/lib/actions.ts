@@ -1,7 +1,11 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
+import { getSessionToken } from "./auth";
+import { SESSION_COOKIE } from "./constants";
 import type { SearchBatchResult } from "./types";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8000";
@@ -23,10 +27,18 @@ export async function runSearchBatch(
     return { status: "error", message: "Informe cidade e segmento." };
   }
 
+  const token = await getSessionToken();
+  if (!token) {
+    return { status: "error", message: "Sessão expirada. Faça login novamente." };
+  }
+
   try {
     const response = await fetch(`${API_BASE_URL}/search-batches`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({ cidade, segmento, limite }),
       cache: "no-store",
     });
@@ -55,10 +67,16 @@ export async function updateLeadStatus(formData: FormData): Promise<void> {
 
   if (!leadId || !statusContato) return;
 
+  const token = await getSessionToken();
+  if (!token) return;
+
   try {
     await fetch(`${API_BASE_URL}/leads/${leadId}`, {
       method: "PATCH",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
       body: JSON.stringify({ status_contato: statusContato }),
       cache: "no-store",
     });
@@ -66,4 +84,50 @@ export async function updateLeadStatus(formData: FormData): Promise<void> {
   } catch {
     // A tela continua funcionando mesmo se a API estiver offline.
   }
+}
+
+export type RequestLinkState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
+
+export async function requestMagicLink(
+  _prevState: RequestLinkState,
+  formData: FormData
+): Promise<RequestLinkState> {
+  const email = String(formData.get("email") ?? "").trim();
+
+  if (!email) {
+    return { status: "error", message: "Informe seu email." };
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/auth/request-link`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email }),
+      cache: "no-store",
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const detail = typeof data?.detail === "string" ? data.detail : "Falha ao enviar link de acesso.";
+      return { status: "error", message: detail };
+    }
+
+    const debugSuffix = data?.debug_link ? ` (modo dev, sem envio de email: ${data.debug_link})` : "";
+    return {
+      status: "success",
+      message: `Verifique seu email para o link de acesso.${debugSuffix}`,
+    };
+  } catch {
+    return { status: "error", message: "Não foi possível conectar à API." };
+  }
+}
+
+export async function logout(): Promise<void> {
+  const store = await cookies();
+  store.delete(SESSION_COOKIE);
+  redirect("/auth/login");
 }

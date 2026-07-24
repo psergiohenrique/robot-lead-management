@@ -1,10 +1,12 @@
 import { LeadBaseTabs } from "@/components/lead-base-tabs";
 import { LeadsFilters } from "@/components/leads-filters";
 import { LeadsTable } from "@/components/leads-table";
+import { LogoutButton } from "@/components/logout-button";
 import { Pagination } from "@/components/pagination";
 import { RunSearchForm } from "@/components/run-search-form";
 import { StatCard } from "@/components/stat-card";
 import { getDashboardSummary, getLeads, getSearchBatches } from "@/lib/api";
+import { requireUser } from "@/lib/auth";
 
 const pipeline = [
   "Novo",
@@ -31,6 +33,7 @@ function paramNumber(params: Record<string, string | string[] | undefined>, key:
 }
 
 export default async function HomePage({ searchParams }: HomePageProps) {
+  const user = await requireUser();
   const params = (await searchParams) ?? {};
   const limit = Math.min(Math.max(paramNumber(params, "limit", 12), 1), 100);
   const offset = paramNumber(params, "offset", 0);
@@ -87,6 +90,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             <p className="mt-2 text-lg font-bold">
               {leads.database_configured ? "Neon DB conectado" : "Aguardando Neon DB"}
             </p>
+            <div className="mt-4 flex items-center justify-between gap-4 border-t border-white/10 pt-4">
+              <p className="text-sm text-slate-300">{user.email}</p>
+              <LogoutButton />
+            </div>
           </div>
         </div>
       </header>
