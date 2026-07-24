@@ -89,72 +89,81 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         ))}
       </section>
 
-      <section className="grid gap-6 lg:grid-cols-[1.25fr_0.75fr]">
-        <div>
-          <div className="mb-4 flex items-end justify-between gap-4">
+      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+        <div className="rounded-[2rem] bg-white p-6 shadow-soft ring-1 ring-black/5">
+          <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
             <div>
-              <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Primeira abordagem</p>
-              <h2 className="mt-2 text-2xl font-black text-slate-950">Leads sem site</h2>
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Coleta de leads</p>
+              <h2 className="mt-2 text-3xl font-black text-slate-950">Buscar novos leads</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                Execute uma busca por cidade e segmento. A API consulta o Google Places e salva os resultados
+                direto no banco para aparecerem na tabela.
+              </p>
             </div>
-            <p className="text-sm text-slate-500">{leads.total.toLocaleString("pt-BR")} registros</p>
-          </div>
-
-          <div className="flex flex-col gap-4">
-            <LeadsFilters cidade={cidade} segmento={segmento} classificacao={classificacao} semSite={semSite} />
-            <LeadsTable leads={leads.items} />
-            <Pagination
-              total={leads.total}
-              limit={leads.limit}
-              offset={leads.offset}
-              query={{
-                cidade,
-                segmento,
-                classificacao,
-                sem_site: semSite,
-              }}
-            />
+            <RunSearchForm />
           </div>
         </div>
 
-        <aside className="flex flex-col gap-6">
-          <div className="rounded-[2rem] bg-white p-6 shadow-soft ring-1 ring-black/5">
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Coleta de leads</p>
-            <h2 className="mt-2 text-2xl font-black text-slate-950">Buscar novos leads</h2>
-            <p className="mt-2 text-sm text-slate-500">
-              Busca empresas na Google Places API e salva direto no banco.
-            </p>
-            <div className="mt-5">
-              <RunSearchForm />
+        <div className="rounded-[2rem] bg-white p-6 shadow-soft ring-1 ring-black/5">
+          <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Mensagem atual</p>
+              <h2 className="mt-2 text-3xl font-black text-slate-950">Promoção Codepath</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                Esta é a oferta usada no botão de WhatsApp da tabela. O lead abre com a mensagem pronta,
+                mas o envio continua manual.
+              </p>
+              <a
+                className="mt-5 inline-flex rounded-2xl bg-yellow-300 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-yellow-200"
+                href="https://promocao.codepath.dev.br/"
+                target="_blank"
+                rel="noreferrer"
+              >
+                Ver site promocional
+              </a>
             </div>
-          </div>
-
-          <div className="rounded-[2rem] bg-white p-6 shadow-soft ring-1 ring-black/5">
-            <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Mensagem atual</p>
-            <h2 className="mt-2 text-2xl font-black">Promoção Codepath</h2>
-            <div className="mt-5 rounded-3xl bg-slate-950 p-5 text-white">
+            <div className="rounded-3xl bg-slate-950 p-5 text-white">
               <p className="font-bold">Site institucional completo</p>
               <p className="mt-3 text-3xl font-black text-yellow-300">R$ 499 à vista</p>
               <p className="mt-3 text-sm leading-6 text-slate-300">
                 + R$ 129,90/mês de manutenção, suporte e cuidados contínuos do site enquanto a Codepath
                 cuidar dele.
               </p>
+              <ul className="mt-5 grid gap-2 text-sm text-slate-200 sm:grid-cols-2">
+                <li>- Site profissional</li>
+                <li>- Layout responsivo</li>
+                <li>- Estrutura pensada para o Google</li>
+                <li>- Suporte direto da Codepath</li>
+              </ul>
             </div>
-            <ul className="mt-5 space-y-3 text-sm text-slate-700">
-              <li>- Site profissional</li>
-              <li>- Layout responsivo</li>
-              <li>- Estrutura pensada para o Google</li>
-              <li>- Suporte direto da Codepath</li>
-            </ul>
-            <a
-              className="mt-6 inline-flex w-full items-center justify-center rounded-2xl bg-yellow-300 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-yellow-200"
-              href="https://promocao.codepath.dev.br/"
-              target="_blank"
-              rel="noreferrer"
-            >
-              Ver site promocional
-            </a>
           </div>
-        </aside>
+        </div>
+      </section>
+
+      <section>
+        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Primeira abordagem</p>
+            <h2 className="mt-2 text-2xl font-black text-slate-950">Leads sem site</h2>
+          </div>
+          <p className="text-sm text-slate-500">{leads.total.toLocaleString("pt-BR")} registros</p>
+        </div>
+
+        <div className="flex flex-col gap-4">
+          <LeadsFilters cidade={cidade} segmento={segmento} classificacao={classificacao} semSite={semSite} />
+          <LeadsTable leads={leads.items} />
+          <Pagination
+            total={leads.total}
+            limit={leads.limit}
+            offset={leads.offset}
+            query={{
+              cidade,
+              segmento,
+              classificacao,
+              sem_site: semSite,
+            }}
+          />
+        </div>
       </section>
     </main>
   );
