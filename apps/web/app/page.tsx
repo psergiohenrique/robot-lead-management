@@ -32,6 +32,18 @@ function paramNumber(params: Record<string, string | string[] | undefined>, key:
   return Number.isFinite(value) && value >= 0 ? value : fallback;
 }
 
+function currentHref(params: Record<string, string | string[] | undefined>): string {
+  const search = new URLSearchParams();
+
+  for (const [key, value] of Object.entries(params)) {
+    const finalValue = Array.isArray(value) ? value[0] : value;
+    if (finalValue && key !== "status_salvo") search.set(key, finalValue);
+  }
+
+  const query = search.toString();
+  return query ? `/?${query}` : "/";
+}
+
 export default async function HomePage({ searchParams }: HomePageProps) {
   const user = await requireUser();
   const params = (await searchParams) ?? {};
@@ -44,6 +56,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const segmento = paramValue(params, "segmento");
   const classificacao = paramValue(params, "classificacao");
   const semSite = paramValue(params, "sem_site") ?? (base === "sem_site" ? "SIM" : undefined);
+  const statusSalvo = paramValue(params, "status_salvo");
+  const returnTo = currentHref(params);
 
   const [summary, batches] = await Promise.all([getDashboardSummary(), getSearchBatches()]);
   const selectedBatchId = base === "pesquisa" ? batchId ?? batches[0]?.id?.toString() : undefined;
@@ -177,6 +191,16 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
 
         <div className="flex flex-col gap-4">
+          {statusSalvo === "ok" ? (
+            <div className="rounded-3xl bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 ring-1 ring-emerald-200">
+              Status do lead salvo com sucesso.
+            </div>
+          ) : null}
+          {statusSalvo === "erro" ? (
+            <div className="rounded-3xl bg-red-50 px-5 py-4 text-sm font-bold text-red-800 ring-1 ring-red-200">
+              Não consegui salvar o status. Confira se a API está online e se o Neon DB está conectado.
+            </div>
+          ) : null}
           <LeadsFilters
             cidade={cidade}
             segmento={segmento}
@@ -185,7 +209,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             base={base}
             batchId={selectedBatchId}
           />
-          <LeadsTable leads={leads.items} />
+          <LeadsTable leads={leads.items} returnTo={returnTo} />
           <Pagination
             total={leads.total}
             limit={leads.limit}

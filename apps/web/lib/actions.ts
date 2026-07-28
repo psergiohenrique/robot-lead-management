@@ -61,17 +61,31 @@ export async function runSearchBatch(
   }
 }
 
+function appendStatusParam(returnTo: string, status: "ok" | "erro"): string {
+  const baseUrl = "http://robot-leads.local";
+  const url = new URL(returnTo || "/", baseUrl);
+  url.searchParams.set("status_salvo", status);
+  return `${url.pathname}${url.search}`;
+}
+
 export async function updateLeadStatus(formData: FormData): Promise<void> {
   const leadId = String(formData.get("lead_id") ?? "").trim();
   const statusContato = String(formData.get("status_contato") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "/").trim() || "/";
 
-  if (!leadId || !statusContato) return;
+  if (!leadId || !statusContato) {
+    redirect(appendStatusParam(returnTo, "erro"));
+  }
+
+  let saved = false;
 
   const token = await getSessionToken();
-  if (!token) return;
+  if (!token) {
+    redirect(appendStatusParam(returnTo, "erro"));
+  }
 
   try {
-    await fetch(`${API_BASE_URL}/leads/${leadId}`, {
+    const response = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
       method: "PATCH",
       headers: {
         "Content-Type": "application/json",
@@ -80,10 +94,16 @@ export async function updateLeadStatus(formData: FormData): Promise<void> {
       body: JSON.stringify({ status_contato: statusContato }),
       cache: "no-store",
     });
-    revalidatePath("/");
+    saved = response.ok;
   } catch {
-    // A tela continua funcionando mesmo se a API estiver offline.
+    saved = false;
   }
+
+  if (saved) {
+    revalidatePath("/");
+  }
+
+  redirect(appendStatusParam(returnTo, saved ? "ok" : "erro"));
 }
 
 export type RequestLinkState = {
