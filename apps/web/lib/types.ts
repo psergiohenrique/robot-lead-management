@@ -43,6 +43,21 @@ export type LeadListResponse = {
   database_configured: boolean;
 };
 
+export type CampaignSummary = {
+  id: number;
+  nome: string;
+  objetivo?: string | null;
+  oferta_principal?: string | null;
+  criterio_principal?: string | null;
+  canal?: string | null;
+  status?: string | null;
+  total_lotes: number;
+  total_leads: number;
+  total_sem_site: number;
+  created_at: string;
+  updated_at?: string | null;
+};
+
 export type SearchBatchResult = {
   id: number;
   status: string;
@@ -55,6 +70,8 @@ export type SearchBatchResult = {
 
 export type SearchBatchSummary = {
   id: number;
+  campaign_id?: number | null;
+  campaign_nome?: string | null;
   nome_lote?: string | null;
   status: string;
   prioridade?: string | null;

@@ -79,6 +79,30 @@ class LeadListResponse(BaseModel):
     database_configured: bool
 
 
+class CampaignCreate(BaseModel):
+    nome: str = Field(default="Venda de site institucional", min_length=2, max_length=120)
+    objetivo: str | None = Field(default="Vender site institucional para empresas sem site", max_length=240)
+    oferta_principal: str | None = Field(default="Site institucional R$ 499 + manutenção mensal", max_length=240)
+    criterio_principal: str | None = Field(default="Empresas sem site cadastrado no Google", max_length=240)
+    canal: str = Field(default="WhatsApp manual", max_length=80)
+    status: str = Field(default="Ativa", max_length=40)
+
+
+class CampaignSummary(BaseModel):
+    id: int
+    nome: str
+    objetivo: str | None = None
+    oferta_principal: str | None = None
+    criterio_principal: str | None = None
+    canal: str | None = None
+    status: str | None = None
+    total_lotes: int = 0
+    total_leads: int = 0
+    total_sem_site: int = 0
+    created_at: datetime
+    updated_at: datetime | None = None
+
+
 class LeadUpdate(BaseModel):
     status_contato: str | None = Field(default=None, max_length=80)
     proximo_followup: date | None = None
@@ -94,6 +118,7 @@ class LeadUpdate(BaseModel):
 
 class SearchBatchCreate(BaseModel):
     nome_lote: str | None = None
+    campaign_id: int | None = None
     cidade: str
     segmento: str
     prioridade: str = "Alta"
@@ -112,6 +137,8 @@ class SearchBatchResult(BaseModel):
 
 class SearchBatchSummary(BaseModel):
     id: int
+    campaign_id: int | None = None
+    campaign_nome: str | None = None
     nome_lote: str | None = None
     status: str
     prioridade: str | None = None

@@ -108,6 +108,34 @@ apps/api/migrations/002_search_batch_leads.sql
 
 A API também tenta criar essa tabela automaticamente quando necessário, para evitar trabalho manual durante o uso normal.
 
+### Campanhas de prospecção
+
+A dashboard agora possui o conceito de **Campanha**. Uma campanha representa uma frente comercial, por exemplo:
+
+```text
+Venda de site institucional
+```
+
+Cada campanha pode ter nome, objetivo, oferta principal, critério principal, canal de abordagem e status.
+
+Quando uma nova busca é feita, ela fica vinculada a uma campanha. Isso permite separar, por exemplo:
+
+- venda de sites para empresas sem site;
+- redesign de sites antigos;
+- projetos de sistema sob medida;
+- campanhas futuras de SEO local ou presença digital.
+
+O MVP começa com a campanha padrão **Venda de site institucional**, focada em empresas sem site cadastrado no Google.
+
+Na prática:
+
+1. escolha ou crie uma campanha;
+2. faça uma busca de cidade + segmento dentro dela;
+3. os leads entram na base geral;
+4. a campanha passa a mostrar quantas buscas, leads e leads sem site ela gerou.
+
+Isso prepara o produto para mudar a lógica de busca e score por campanha nas próximas sprints.
+
 ### Neon DB
 
 O banco será Postgres no Neon. A API espera a variável:
@@ -120,6 +148,9 @@ O schema inicial está em:
 
 ```text
 apps/api/migrations/001_initial_schema.sql
+apps/api/migrations/002_auth.sql
+apps/api/migrations/002_search_batch_leads.sql
+apps/api/migrations/003_campaigns.sql
 ```
 
 ### Vercel

@@ -32,6 +32,161 @@ def ensure_search_batch_leads_table() -> None:
         connection.commit()
 
 
+def ensure_campaigns_table() -> None:
+    if not database_configured():
+        return
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS campaigns (
+                    id BIGSERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    nome TEXT NOT NULL,
+                    objetivo TEXT,
+                    oferta_principal TEXT,
+                    criterio_principal TEXT,
+                    canal TEXT NOT NULL DEFAULT 'WhatsApp manual',
+                    status TEXT NOT NULL DEFAULT 'Ativa',
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+                    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            )
+            cursor.execute(
+                "ALTER TABLE search_batches ADD COLUMN IF NOT EXISTS campaign_id BIGINT REFERENCES campaigns(id) ON DELETE SET NULL"
+            )
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_campaigns_user_id ON campaigns (user_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_campaigns_status ON campaigns (status)")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_search_batches_campaign_id ON search_batches (campaign_id)"
+            )
+        connection.commit()
+
+
+def create_campaign(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
+    if not database_configured():
+        raise RuntimeError("DATABASE_URL não configurada.")
+
+    ensure_campaigns_table()
+    values = {
+        "user_id": user_id,
+        "nome": payload.get("nome") or "Venda de site institucional",
+        "objetivo": payload.get("objetivo") or "Vender site institucional para empresas sem site",
+        "oferta_principal": payload.get("oferta_principal") or "Site institucional R$ 499 + manutenção mensal",
+        "criterio_principal": payload.get("criterio_principal") or "Empresas sem site cadastrado no Google",
+        "canal": payload.get("canal") or "WhatsApp manual",
+        "status": payload.get("status") or "Ativa",
+    }
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO campaigns (
+                    user_id, nome, objetivo, oferta_principal, criterio_principal, canal, status
+                ) VALUES (
+                    %(user_id)s, %(nome)s, %(objetivo)s, %(oferta_principal)s,
+                    %(criterio_principal)s, %(canal)s, %(status)s
+                )
+                RETURNING *
+                """,
+                values,
+            )
+            campaign = dict(cursor.fetchone())
+        connection.commit()
+    return campaign
+
+
+def get_or_create_default_campaign(user_id: int) -> dict[str, Any]:
+    ensure_campaigns_table()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT *
+                FROM campaigns
+                WHERE user_id = %(user_id)s
+                  AND nome = 'Venda de site institucional'
+                ORDER BY id
+                LIMIT 1
+                """,
+                {"user_id": user_id},
+            )
+            row = cursor.fetchone()
+            if row:
+                return dict(row)
+
+            cursor.execute(
+                """
+                INSERT INTO campaigns (
+                    user_id, nome, objetivo, oferta_principal, criterio_principal, canal, status
+                ) VALUES (
+                    %(user_id)s,
+                    'Venda de site institucional',
+                    'Vender site institucional para empresas sem site',
+                    'Site institucional R$ 499 + manutenção mensal',
+                    'Empresas sem site cadastrado no Google',
+                    'WhatsApp manual',
+                    'Ativa'
+                )
+                RETURNING *
+                """,
+                {"user_id": user_id},
+            )
+            campaign = dict(cursor.fetchone())
+        connection.commit()
+    return campaign
+
+
+def get_campaign(campaign_id: int, user_id: int) -> dict[str, Any] | None:
+    if not database_configured():
+        return None
+
+    ensure_campaigns_table()
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "SELECT * FROM campaigns WHERE id = %(id)s AND user_id = %(user_id)s",
+                {"id": campaign_id, "user_id": user_id},
+            )
+            row = cursor.fetchone()
+            return dict(row) if row else None
+
+
+def list_campaigns(user_id: int) -> list[dict[str, Any]]:
+    if not database_configured():
+        return []
+
+    ensure_campaigns_table()
+    ensure_search_batch_leads_table()
+    get_or_create_default_campaign(user_id)
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    c.*,
+                    COUNT(DISTINCT sb.id)::int AS total_lotes,
+                    COUNT(DISTINCT sbl.lead_id)::int AS total_leads,
+                    COUNT(DISTINCT sbl.lead_id) FILTER (WHERE l.sem_site_cadastrado = 'SIM')::int AS total_sem_site
+                FROM campaigns c
+                LEFT JOIN search_batches sb ON sb.campaign_id = c.id
+                LEFT JOIN search_batch_leads sbl ON sbl.batch_id = sb.id
+                LEFT JOIN leads l ON l.id = sbl.lead_id
+                WHERE c.user_id = %(user_id)s
+                GROUP BY c.id
+                ORDER BY
+                    CASE c.status WHEN 'Ativa' THEN 1 ELSE 2 END,
+                    c.created_at DESC
+                """,
+                {"user_id": user_id},
+            )
+            return [dict(row) for row in cursor.fetchall()]
+
+
 def get_dashboard_summary(user_id: int) -> dict[str, int]:
     if not database_configured():
         return {
@@ -79,11 +234,15 @@ def list_leads(
     classificacao: str | None = None,
     sem_site: str | None = None,
     batch_id: int | None = None,
+    campaign_id: int | None = None,
 ) -> tuple[list[dict[str, Any]], int]:
     if not database_configured():
         return [], 0
 
     if batch_id:
+        ensure_search_batch_leads_table()
+    if campaign_id:
+        ensure_campaigns_table()
         ensure_search_batch_leads_table()
 
     filters: list[str] = ["l.user_id = %(user_id)s"]
@@ -101,6 +260,20 @@ def list_leads(
     if sem_site:
         filters.append("sem_site_cadastrado = %(sem_site)s")
         params["sem_site"] = sem_site
+    if campaign_id:
+        filters.append(
+            """
+            EXISTS (
+                SELECT 1
+                FROM search_batch_leads campaign_sbl
+                INNER JOIN search_batches campaign_sb ON campaign_sb.id = campaign_sbl.batch_id
+                WHERE campaign_sbl.lead_id = l.id
+                  AND campaign_sb.campaign_id = %(campaign_id)s
+                  AND campaign_sb.user_id = %(user_id)s
+            )
+            """
+        )
+        params["campaign_id"] = campaign_id
 
     from_clause = "leads l"
     if batch_id:
@@ -228,7 +401,14 @@ def _marcar_erro(batch_id: int, item_id: int, erro: str) -> None:
 
 
 def criar_e_executar_lote(
-    *, user_id: int, cidade: str, segmento: str, prioridade: str, limite: int, nome_lote: str | None
+    *,
+    user_id: int,
+    cidade: str,
+    segmento: str,
+    prioridade: str,
+    limite: int,
+    nome_lote: str | None,
+    campaign_id: int | None = None,
 ) -> dict[str, Any]:
     if not database_configured():
         raise RuntimeError("DATABASE_URL não configurada.")
@@ -239,16 +419,31 @@ def criar_e_executar_lote(
         raise RuntimeError("GOOGLE_PLACES_API_KEY não configurada.")
 
     query_base = f"{segmento} em {cidade}"
+    campaign = get_campaign(campaign_id, user_id) if campaign_id else get_or_create_default_campaign(user_id)
+    if campaign_id and not campaign:
+        raise RuntimeError("Campanha não encontrada para este usuário.")
+    final_campaign_id = campaign["id"]
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                INSERT INTO search_batches (user_id, nome_lote, status, prioridade, total_planejado, started_at)
-                VALUES (%(user_id)s, %(nome_lote)s, 'running', %(prioridade)s, %(limite)s, now())
+                INSERT INTO search_batches (
+                    user_id, campaign_id, nome_lote, status, prioridade, total_planejado, started_at
+                )
+                VALUES (
+                    %(user_id)s, %(campaign_id)s, %(nome_lote)s, 'running',
+                    %(prioridade)s, %(limite)s, now()
+                )
                 RETURNING id
                 """,
-                {"user_id": user_id, "nome_lote": nome_lote, "prioridade": prioridade, "limite": limite},
+                {
+                    "user_id": user_id,
+                    "campaign_id": final_campaign_id,
+                    "nome_lote": nome_lote,
+                    "prioridade": prioridade,
+                    "limite": limite,
+                },
             )
             batch_id = cursor.fetchone()["id"]
             cursor.execute(
@@ -363,22 +558,26 @@ def criar_e_executar_lote(
     }
 
 
-def list_search_batches(user_id: int, limit: int = 20) -> list[dict[str, Any]]:
+def list_search_batches(user_id: int, limit: int = 20, campaign_id: int | None = None) -> list[dict[str, Any]]:
     if not database_configured():
         return []
+    ensure_campaigns_table()
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT sb.id, sb.nome_lote, sb.status, sb.prioridade, sb.total_leads,
+                SELECT sb.id, sb.campaign_id, c.nome AS campaign_nome,
+                       sb.nome_lote, sb.status, sb.prioridade, sb.total_leads,
                        sb.total_sem_site, sb.erro, sb.created_at, sb.finished_at,
                        sbi.cidade, sbi.segmento
                 FROM search_batches sb
+                LEFT JOIN campaigns c ON c.id = sb.campaign_id
                 LEFT JOIN search_batch_items sbi ON sbi.batch_id = sb.id
                 WHERE sb.user_id = %(user_id)s
+                  AND (%(campaign_id)s IS NULL OR sb.campaign_id = %(campaign_id)s)
                 ORDER BY sb.created_at DESC
                 LIMIT %(limit)s
                 """,
-                {"user_id": user_id, "limit": limit},
+                {"user_id": user_id, "limit": limit, "campaign_id": campaign_id},
             )
             return [dict(row) for row in cursor.fetchall()]

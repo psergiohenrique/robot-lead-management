@@ -6,11 +6,16 @@ import { redirect } from "next/navigation";
 
 import { getSessionToken } from "./auth";
 import { SESSION_COOKIE } from "./constants";
-import type { SearchBatchResult } from "./types";
+import type { CampaignSummary, SearchBatchResult } from "./types";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8000";
 
 export type RunSearchState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
+
+export type CreateCampaignState = {
   status: "idle" | "success" | "error";
   message: string;
 };
@@ -22,6 +27,7 @@ export async function runSearchBatch(
   const cidade = String(formData.get("cidade") ?? "").trim();
   const segmento = String(formData.get("segmento") ?? "").trim();
   const limite = Number.parseInt(String(formData.get("limite") ?? "20"), 10) || 20;
+  const campaignId = Number.parseInt(String(formData.get("campaign_id") ?? ""), 10);
 
   if (!cidade || !segmento) {
     return { status: "error", message: "Informe cidade e segmento." };
@@ -39,7 +45,12 @@ export async function runSearchBatch(
         "Content-Type": "application/json",
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ cidade, segmento, limite }),
+      body: JSON.stringify({
+        cidade,
+        segmento,
+        limite,
+        campaign_id: Number.isFinite(campaignId) ? campaignId : undefined,
+      }),
       cache: "no-store",
     });
 
@@ -56,6 +67,55 @@ export async function runSearchBatch(
       status: "success",
       message: `${resultado.total_encontrado} empresa(s) encontrada(s) — ${resultado.total_sem_site} sem site (${resultado.novos_leads} novo(s), ${resultado.leads_atualizados} atualizado(s)).`,
     };
+  } catch {
+    return { status: "error", message: "Não foi possível conectar à API." };
+  }
+}
+
+export async function createCampaign(
+  _prevState: CreateCampaignState,
+  formData: FormData
+): Promise<CreateCampaignState> {
+  const nome = String(formData.get("nome") ?? "").trim();
+  const objetivo = String(formData.get("objetivo") ?? "").trim();
+  const ofertaPrincipal = String(formData.get("oferta_principal") ?? "").trim();
+  const criterioPrincipal = String(formData.get("criterio_principal") ?? "").trim();
+
+  if (!nome) {
+    return { status: "error", message: "Informe o nome da campanha." };
+  }
+
+  const token = await getSessionToken();
+  if (!token) {
+    return { status: "error", message: "Sessão expirada. Faça login novamente." };
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/campaigns`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        nome,
+        objetivo: objetivo || undefined,
+        oferta_principal: ofertaPrincipal || undefined,
+        criterio_principal: criterioPrincipal || undefined,
+      }),
+      cache: "no-store",
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const detail = typeof data?.detail === "string" ? data.detail : "Falha ao criar campanha.";
+      return { status: "error", message: detail };
+    }
+
+    const campaign = data as CampaignSummary;
+    revalidatePath("/");
+    return { status: "success", message: `Campanha "${campaign.nome}" criada com sucesso.` };
   } catch {
     return { status: "error", message: "Não foi possível conectar à API." };
   }

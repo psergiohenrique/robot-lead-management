@@ -3,6 +3,7 @@ import type { SearchBatchSummary } from "@/lib/types";
 type LeadBaseTabsProps = {
   activeBase: string;
   activeBatchId?: string;
+  activeCampaignId?: string;
   batches: SearchBatchSummary[];
 };
 
@@ -24,7 +25,7 @@ function tabClass(active: boolean): string {
   ].join(" ");
 }
 
-export function LeadBaseTabs({ activeBase, activeBatchId, batches }: LeadBaseTabsProps) {
+export function LeadBaseTabs({ activeBase, activeBatchId, activeCampaignId, batches }: LeadBaseTabsProps) {
   return (
     <div className="rounded-[2rem] bg-white p-4 shadow-soft ring-1 ring-black/5">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
@@ -37,15 +38,19 @@ export function LeadBaseTabs({ activeBase, activeBatchId, batches }: LeadBaseTab
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <a className={tabClass(activeBase === "sem_site")} href={hrefFor({ base: "sem_site" })}>
+          <a className={tabClass(activeBase === "sem_site")} href={hrefFor({ base: "sem_site", campaign_id: activeCampaignId })}>
             Sem site
           </a>
-          <a className={tabClass(activeBase === "todos")} href={hrefFor({ base: "todos", sem_site: "" })}>
+          <a className={tabClass(activeBase === "todos")} href={hrefFor({ base: "todos", sem_site: "", campaign_id: activeCampaignId })}>
             Todos os leads
           </a>
           <a
             className={tabClass(activeBase === "pesquisa")}
-            href={hrefFor({ base: "pesquisa", batch_id: activeBatchId ?? batches[0]?.id?.toString() })}
+            href={hrefFor({
+              base: "pesquisa",
+              batch_id: activeBatchId ?? batches[0]?.id?.toString(),
+              campaign_id: activeCampaignId,
+            })}
           >
             Por pesquisa
           </a>
@@ -55,6 +60,7 @@ export function LeadBaseTabs({ activeBase, activeBatchId, batches }: LeadBaseTab
       {activeBase === "pesquisa" ? (
         <form className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]" action="/">
           <input type="hidden" name="base" value="pesquisa" />
+          {activeCampaignId ? <input type="hidden" name="campaign_id" value={activeCampaignId} /> : null}
           <label className="flex flex-col gap-1 text-sm">
             <span className="font-bold text-slate-700">Pesquisa anterior</span>
             <select

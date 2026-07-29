@@ -7,15 +7,19 @@ from app.auth import get_current_user, request_magic_link, verify_magic_link
 from app.config import get_settings
 from app.db import database_configured
 from app.repositories import (
+    create_campaign,
     criar_e_executar_lote,
     get_dashboard_summary,
     get_lead,
+    list_campaigns,
     list_leads,
     list_search_batches,
     update_lead_contact,
 )
 from app.schemas import (
     AuthSession,
+    CampaignCreate,
+    CampaignSummary,
     DashboardSummary,
     HealthResponse,
     LeadListResponse,
@@ -82,6 +86,20 @@ def dashboard_summary(current_user: dict = Depends(get_current_user)) -> Dashboa
     return DashboardSummary(**get_dashboard_summary(current_user["id"]))
 
 
+@app.get("/campaigns", response_model=list[CampaignSummary])
+def campaigns(current_user: dict = Depends(get_current_user)) -> list[dict]:
+    return list_campaigns(current_user["id"])
+
+
+@app.post("/campaigns", response_model=CampaignSummary, status_code=201)
+def new_campaign(payload: CampaignCreate, current_user: dict = Depends(get_current_user)) -> CampaignSummary:
+    try:
+        campaign = create_campaign(current_user["id"], payload.model_dump())
+    except RuntimeError as erro:
+        raise HTTPException(status_code=502, detail=str(erro)) from erro
+    return CampaignSummary(**{**campaign, "total_lotes": 0, "total_leads": 0, "total_sem_site": 0})
+
+
 @app.get("/leads", response_model=LeadListResponse)
 def leads(
     limit: int = Query(default=50, ge=1, le=200),
@@ -91,6 +109,7 @@ def leads(
     classificacao: str | None = None,
     sem_site: str | None = None,
     batch_id: int | None = Query(default=None, ge=1),
+    campaign_id: int | None = Query(default=None, ge=1),
     current_user: dict = Depends(get_current_user),
 ) -> LeadListResponse:
     items, total = list_leads(
@@ -102,6 +121,7 @@ def leads(
         classificacao=classificacao,
         sem_site=sem_site,
         batch_id=batch_id,
+        campaign_id=campaign_id,
     )
     return LeadListResponse(
         items=items,
@@ -140,6 +160,7 @@ def create_search_batch(
             prioridade=payload.prioridade,
             limite=payload.limite,
             nome_lote=payload.nome_lote,
+            campaign_id=payload.campaign_id,
         )
     except RuntimeError as erro:
         raise HTTPException(status_code=502, detail=str(erro)) from erro
@@ -148,9 +169,11 @@ def create_search_batch(
 
 @app.get("/search-batches", response_model=list[SearchBatchSummary])
 def search_batches(
-    limit: int = Query(default=20, ge=1, le=100), current_user: dict = Depends(get_current_user)
+    limit: int = Query(default=20, ge=1, le=100),
+    campaign_id: int | None = Query(default=None, ge=1),
+    current_user: dict = Depends(get_current_user),
 ) -> list[dict]:
-    return list_search_batches(current_user["id"], limit=limit)
+    return list_search_batches(current_user["id"], limit=limit, campaign_id=campaign_id)
 
 
 @app.get("/whatsapp/top-leads", response_model=LeadListResponse)

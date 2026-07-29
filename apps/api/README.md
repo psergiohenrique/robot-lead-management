@@ -29,6 +29,8 @@ Rode os arquivos de `migrations/` em ordem no seu Postgres (Neon):
 ```bash
 psql "$DATABASE_URL" -f migrations/001_initial_schema.sql
 psql "$DATABASE_URL" -f migrations/002_auth.sql
+psql "$DATABASE_URL" -f migrations/002_search_batch_leads.sql
+psql "$DATABASE_URL" -f migrations/003_campaigns.sql
 ```
 
 ## Autenticação

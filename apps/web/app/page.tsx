@@ -1,3 +1,4 @@
+import { CampaignsPanel } from "@/components/campaigns-panel";
 import { LeadBaseTabs } from "@/components/lead-base-tabs";
 import { LeadsFilters } from "@/components/leads-filters";
 import { LeadsTable } from "@/components/leads-table";
@@ -5,7 +6,7 @@ import { LogoutButton } from "@/components/logout-button";
 import { Pagination } from "@/components/pagination";
 import { RunSearchForm } from "@/components/run-search-form";
 import { StatCard } from "@/components/stat-card";
-import { getDashboardSummary, getLeads, getSearchBatches } from "@/lib/api";
+import { getCampaigns, getDashboardSummary, getLeads, getSearchBatches } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 
 const pipeline = [
@@ -52,6 +53,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const rawBase = paramValue(params, "base") ?? "sem_site";
   const base = ["sem_site", "todos", "pesquisa"].includes(rawBase) ? rawBase : "sem_site";
   const batchId = paramValue(params, "batch_id");
+  const campaignId = paramValue(params, "campaign_id");
   const cidade = paramValue(params, "cidade");
   const segmento = paramValue(params, "segmento");
   const classificacao = paramValue(params, "classificacao");
@@ -59,7 +61,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const statusSalvo = paramValue(params, "status_salvo");
   const returnTo = currentHref(params);
 
-  const [summary, batches] = await Promise.all([getDashboardSummary(), getSearchBatches()]);
+  const [summary, campaigns] = await Promise.all([getDashboardSummary(), getCampaigns()]);
+  const selectedCampaignId = campaignId ?? campaigns[0]?.id?.toString();
+  const batches = await getSearchBatches(30, selectedCampaignId);
   const selectedBatchId = base === "pesquisa" ? batchId ?? batches[0]?.id?.toString() : undefined;
   const leads = await getLeads({
     limit,
@@ -69,9 +73,11 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     classificacao,
     sem_site: semSite,
     batch_id: selectedBatchId,
+    campaign_id: selectedCampaignId,
   });
 
   const currentBatch = batches.find((batch) => String(batch.id) === selectedBatchId);
+  const currentCampaign = campaigns.find((campaign) => String(campaign.id) === selectedCampaignId);
   const sectionTitle =
     base === "todos"
       ? "Todos os leads"
@@ -82,8 +88,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     base === "pesquisa" && currentBatch
       ? `${currentBatch.cidade ?? "Cidade não informada"} / ${currentBatch.segmento ?? "Segmento não informado"}`
       : base === "todos"
-        ? "Base geral consolidada"
-        : "Primeira abordagem";
+        ? currentCampaign
+          ? `Base geral da campanha ${currentCampaign.nome}`
+          : "Base geral consolidada"
+        : currentCampaign
+          ? `Primeira abordagem da campanha ${currentCampaign.nome}`
+          : "Primeira abordagem";
 
   return (
     <main className="mx-auto flex min-h-screen max-w-7xl flex-col gap-8 px-5 py-8 sm:px-8">
@@ -128,6 +138,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         ))}
       </section>
 
+      <CampaignsPanel campaigns={campaigns} activeCampaignId={selectedCampaignId} />
+
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="rounded-[2rem] bg-white p-6 shadow-soft ring-1 ring-black/5">
           <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
@@ -139,7 +151,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 direto no banco para aparecerem na tabela.
               </p>
             </div>
-            <RunSearchForm />
+            <RunSearchForm campaigns={campaigns} activeCampaignId={selectedCampaignId} />
           </div>
         </div>
 
@@ -180,7 +192,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       </section>
 
       <section>
-        <LeadBaseTabs activeBase={base} activeBatchId={selectedBatchId} batches={batches} />
+        <LeadBaseTabs
+          activeBase={base}
+          activeBatchId={selectedBatchId}
+          activeCampaignId={selectedCampaignId}
+          batches={batches}
+        />
 
         <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
           <div>
@@ -208,6 +225,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             semSite={semSite}
             base={base}
             batchId={selectedBatchId}
+            campaignId={selectedCampaignId}
           />
           <LeadsTable leads={leads.items} returnTo={returnTo} />
           <Pagination
@@ -221,6 +239,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               sem_site: semSite,
               base,
               batch_id: selectedBatchId,
+              campaign_id: selectedCampaignId,
             }}
           />
         </div>

@@ -5,13 +5,23 @@ type LeadsFiltersProps = {
   semSite?: string;
   base?: string;
   batchId?: string;
+  campaignId?: string;
 };
 
-export function LeadsFilters({ cidade, segmento, classificacao, semSite = "SIM", base, batchId }: LeadsFiltersProps) {
+export function LeadsFilters({
+  cidade,
+  segmento,
+  classificacao,
+  semSite = "SIM",
+  base,
+  batchId,
+  campaignId,
+}: LeadsFiltersProps) {
   return (
     <form className="grid gap-3 rounded-3xl bg-white p-4 shadow-soft ring-1 ring-black/5 md:grid-cols-5" action="/">
       {base ? <input type="hidden" name="base" value={base} /> : null}
       {batchId ? <input type="hidden" name="batch_id" value={batchId} /> : null}
+      {campaignId ? <input type="hidden" name="campaign_id" value={campaignId} /> : null}
 
       <label className="flex flex-col gap-1 text-sm">
         <span className="font-bold text-slate-700">Cidade</span>
@@ -66,7 +76,11 @@ export function LeadsFilters({ cidade, segmento, classificacao, semSite = "SIM",
         </button>
         <a
           className="rounded-2xl border border-slate-200 px-4 py-2.5 text-sm font-bold text-slate-700 transition hover:bg-slate-100"
-          href={base === "pesquisa" && batchId ? `/?base=pesquisa&batch_id=${batchId}` : `/?base=${base ?? "sem_site"}`}
+          href={
+            base === "pesquisa" && batchId
+              ? `/?base=pesquisa&batch_id=${batchId}${campaignId ? `&campaign_id=${campaignId}` : ""}`
+              : `/?base=${base ?? "sem_site"}${campaignId ? `&campaign_id=${campaignId}` : ""}`
+          }
         >
           Limpar
         </a>

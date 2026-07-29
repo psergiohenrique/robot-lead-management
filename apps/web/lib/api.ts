@@ -1,5 +1,5 @@
 import { getSessionToken } from "./auth";
-import type { DashboardSummary, LeadListResponse, SearchBatchSummary } from "./types";
+import type { CampaignSummary, DashboardSummary, LeadListResponse, SearchBatchSummary } from "./types";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8000";
 
@@ -60,6 +60,7 @@ type LeadQuery = {
   classificacao?: string;
   sem_site?: string;
   batch_id?: string;
+  campaign_id?: string;
 };
 
 export async function getLeads(query: LeadQuery = {}): Promise<LeadListResponse> {
@@ -75,6 +76,7 @@ export async function getLeads(query: LeadQuery = {}): Promise<LeadListResponse>
   if (query.classificacao) params.set("classificacao", query.classificacao);
   if (query.sem_site) params.set("sem_site", query.sem_site);
   if (query.batch_id) params.set("batch_id", query.batch_id);
+  if (query.campaign_id) params.set("campaign_id", query.campaign_id);
 
   return apiGet<LeadListResponse>(`/leads?${params.toString()}`, {
     ...emptyLeads,
@@ -83,6 +85,13 @@ export async function getLeads(query: LeadQuery = {}): Promise<LeadListResponse>
   });
 }
 
-export async function getSearchBatches(limit = 30): Promise<SearchBatchSummary[]> {
-  return apiGet<SearchBatchSummary[]>(`/search-batches?limit=${limit}`, []);
+export async function getSearchBatches(limit = 30, campaignId?: string): Promise<SearchBatchSummary[]> {
+  const params = new URLSearchParams();
+  params.set("limit", String(limit));
+  if (campaignId) params.set("campaign_id", campaignId);
+  return apiGet<SearchBatchSummary[]>(`/search-batches?${params.toString()}`, []);
+}
+
+export async function getCampaigns(): Promise<CampaignSummary[]> {
+  return apiGet<CampaignSummary[]>("/campaigns", []);
 }
