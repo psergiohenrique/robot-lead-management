@@ -1,6 +1,5 @@
-import { LeadStatusForm } from "@/components/lead-status-form";
 import type { Lead } from "@/lib/types";
-import { criarLinkWhatsApp, limparTelefoneBrasil } from "@/lib/whatsapp";
+import { limparTelefoneBrasil } from "@/lib/whatsapp";
 
 const columns = [
   "Novo",
@@ -49,73 +48,63 @@ export function KanbanBoard({ leads, returnTo }: KanbanBoardProps) {
 
   return (
     <div className="overflow-x-auto pb-3">
-      <div className="grid min-w-[1600px] grid-cols-8 gap-4">
+      <div className="grid min-w-[1480px] grid-cols-8 gap-3">
         {grouped.map((group) => (
-          <section key={group.title} className="rounded-[1.75rem] bg-white p-4 shadow-soft ring-1 ring-black/5">
+          <section key={group.title} className="rounded-[1.5rem] bg-white p-3 shadow-soft ring-1 ring-black/5">
             <div className="sticky top-0 z-10 bg-white pb-3">
-              <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{group.title}</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">{group.title}</p>
               <p className="mt-1 text-2xl font-black text-slate-950">{group.leads.length}</p>
             </div>
 
-            <div className="mt-2 flex max-h-[760px] flex-col gap-3 overflow-y-auto pr-1">
+            <div className="mt-1 flex max-h-[760px] flex-col gap-2 overflow-y-auto pr-1">
               {group.leads.length ? (
                 group.leads.map((lead) => {
-                  const whatsappLink = criarLinkWhatsApp(lead);
                   const telefoneLimpo = limparTelefoneBrasil(lead);
+                  const detailHref = lead.id
+                    ? `/kanban/lead/${lead.id}?return_to=${encodeURIComponent(returnTo)}`
+                    : "#";
 
                   return (
-                    <article key={lead.id ?? lead.nome} className="rounded-3xl bg-slate-50 p-4 ring-1 ring-black/5">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <p className="text-sm font-black leading-5 text-slate-950">{lead.nome}</p>
-                          <p className="mt-1 text-xs text-slate-500">
+                    <a
+                      key={lead.id ?? lead.nome}
+                      href={detailHref}
+                      className="block rounded-2xl bg-slate-50 p-3 ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:bg-yellow-50 hover:shadow-soft"
+                    >
+                      <div className="flex items-start justify-between gap-2">
+                        <div className="min-w-0">
+                          <p className="line-clamp-2 text-sm font-black leading-5 text-slate-950">{lead.nome}</p>
+                          <p className="mt-1 truncate text-xs text-slate-500">
                             {lead.cidade ?? "-"} · {lead.segmento ?? "-"}
                           </p>
                         </div>
-                        <span className={`rounded-full px-2.5 py-1 text-[11px] font-black ${scoreTone(lead.classificacao_lead)}`}>
-                          {lead.classificacao_lead ?? "Sem classificação"}
+                        <span
+                          className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ${scoreTone(
+                            lead.classificacao_lead
+                          )}`}
+                        >
+                          {lead.classificacao_lead ?? "-"}
                         </span>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                      <div className="mt-3 grid grid-cols-2 gap-1.5 text-[11px] text-slate-600">
                         <span>
                           Score <strong className="text-slate-950">{lead.score_oportunidade ?? "-"}</strong>
                         </span>
                         <span>
-                          Avaliações{" "}
-                          <strong className="text-slate-950">{lead.quantidade_avaliacoes ?? "-"}</strong>
+                          Aval. <strong className="text-slate-950">{lead.quantidade_avaliacoes ?? "-"}</strong>
                         </span>
-                        <span className="col-span-2">
-                          WhatsApp <strong className="text-slate-950">{lead.whatsapp_status ?? "Verificar"}</strong>
+                        <span className="col-span-2 truncate">{lead.whatsapp_status ?? "Verificar WhatsApp"}</span>
+                        <span className="col-span-2 truncate text-slate-400">
+                          {lead.telefone || telefoneLimpo || "Sem telefone"}
                         </span>
-                        <span className="col-span-2 text-slate-400">{lead.telefone || telefoneLimpo || "Sem telefone"}</span>
                       </div>
 
-                      <div className="mt-4 space-y-2">
-                        {lead.id ? (
-                          <LeadStatusForm leadId={lead.id} status={lead.status_contato} returnTo={returnTo} compact />
-                        ) : null}
-
-                        {whatsappLink ? (
-                          <a
-                            className="flex w-full items-center justify-center rounded-2xl bg-green-600 px-3 py-2 text-xs font-black text-white transition hover:bg-green-700"
-                            href={whatsappLink}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Abrir WhatsApp
-                          </a>
-                        ) : (
-                          <span className="flex w-full items-center justify-center rounded-2xl bg-slate-200 px-3 py-2 text-xs font-bold text-slate-500">
-                            Verificar telefone
-                          </span>
-                        )}
-                      </div>
-                    </article>
+                      <p className="mt-3 text-[11px] font-bold text-yellow-800">Abrir detalhes</p>
+                    </a>
                   );
                 })
               ) : (
-                <div className="rounded-3xl border border-dashed border-slate-200 p-4 text-center text-xs font-bold text-slate-400">
+                <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs font-bold text-slate-400">
                   Sem leads nesta etapa
                 </div>
               )}

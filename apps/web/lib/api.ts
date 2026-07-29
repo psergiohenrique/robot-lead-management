@@ -1,5 +1,5 @@
 import { getSessionToken } from "./auth";
-import type { CampaignSummary, DashboardSummary, LeadListResponse, SearchBatchSummary } from "./types";
+import type { CampaignSummary, DashboardSummary, Lead, LeadListResponse, SearchBatchSummary } from "./types";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8000";
 
@@ -90,6 +90,10 @@ export async function getSearchBatches(limit = 30, campaignId?: string): Promise
   params.set("limit", String(limit));
   if (campaignId) params.set("campaign_id", campaignId);
   return apiGet<SearchBatchSummary[]>(`/search-batches?${params.toString()}`, []);
+}
+
+export async function getLead(leadId: string): Promise<Lead | null> {
+  return apiGet<Lead | null>(`/leads/${leadId}`, null);
 }
 
 export async function getCampaigns(): Promise<CampaignSummary[]> {

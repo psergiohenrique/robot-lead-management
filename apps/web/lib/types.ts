@@ -21,18 +21,25 @@ export type Lead = {
   telefone?: string | null;
   telefone_limpo?: string | null;
   whatsapp_status?: string | null;
+  endereco?: string | null;
   cidade?: string | null;
   segmento?: string | null;
   regiao?: string | null;
   google_maps_url?: string | null;
   avaliacao?: number | null;
   quantidade_avaliacoes?: number | null;
+  site_cadastrado?: string | null;
   sem_site_cadastrado?: string | null;
   score_oportunidade?: number | null;
   classificacao_lead?: string | null;
   prioridade?: string | null;
   status_contato?: string | null;
   proximo_followup?: string | null;
+  oferta_principal?: string | null;
+  observacao_comercial?: string | null;
+  motivo_perda?: string | null;
+  observacao_humana?: string | null;
+  updated_at?: string | null;
 };
 
 export type LeadListResponse = {
