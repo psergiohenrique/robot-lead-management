@@ -12,13 +12,18 @@ const columns = [
   "Perdido",
 ];
 
+const statusAliases: Record<string, string> = {
+  "DiagnÃ³stico enviado": "Diagnóstico enviado",
+  "ReuniÃ£o marcada": "Reunião marcada",
+};
+
 type KanbanBoardProps = {
   leads: Lead[];
   returnTo: string;
 };
 
 function normalizeStatus(status?: string | null): string {
-  const value = status?.trim();
+  const value = statusAliases[status?.trim() ?? ""] ?? status?.trim();
   return value && columns.includes(value) ? value : "Novo";
 }
 
@@ -48,15 +53,15 @@ export function KanbanBoard({ leads, returnTo }: KanbanBoardProps) {
 
   return (
     <div className="overflow-x-auto pb-3">
-      <div className="grid min-w-[1480px] grid-cols-8 gap-3">
+      <div className="grid min-w-[1320px] grid-cols-8 gap-3">
         {grouped.map((group) => (
-          <section key={group.title} className="rounded-[1.5rem] bg-white p-3 shadow-soft ring-1 ring-black/5">
-            <div className="sticky top-0 z-10 bg-white pb-3">
+          <section key={group.title} className="rounded-[1.35rem] bg-white p-3 shadow-soft ring-1 ring-black/5">
+            <div className="sticky top-0 z-10 rounded-t-[1.1rem] bg-white pb-3">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">{group.title}</p>
               <p className="mt-1 text-2xl font-black text-slate-950">{group.leads.length}</p>
             </div>
 
-            <div className="mt-1 flex max-h-[760px] flex-col gap-2 overflow-y-auto pr-1">
+            <div className="mt-1 flex max-h-[720px] flex-col gap-2 overflow-y-auto pr-1">
               {group.leads.length ? (
                 group.leads.map((lead) => {
                   const telefoneLimpo = limparTelefoneBrasil(lead);
@@ -68,17 +73,17 @@ export function KanbanBoard({ leads, returnTo }: KanbanBoardProps) {
                     <a
                       key={lead.id ?? lead.nome}
                       href={detailHref}
-                      className="block rounded-2xl bg-slate-50 p-3 ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:bg-yellow-50 hover:shadow-soft"
+                      className="group block rounded-2xl bg-slate-50 p-3 ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:bg-yellow-50 hover:shadow-soft"
                     >
                       <div className="flex items-start justify-between gap-2">
                         <div className="min-w-0">
-                          <p className="line-clamp-2 text-sm font-black leading-5 text-slate-950">{lead.nome}</p>
+                          <p className="line-clamp-2 text-[13px] font-black leading-5 text-slate-950">{lead.nome}</p>
                           <p className="mt-1 truncate text-xs text-slate-500">
                             {lead.cidade ?? "-"} · {lead.segmento ?? "-"}
                           </p>
                         </div>
                         <span
-                          className={`shrink-0 rounded-full px-2 py-1 text-[10px] font-black ${scoreTone(
+                          className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black ${scoreTone(
                             lead.classificacao_lead
                           )}`}
                         >
@@ -86,20 +91,23 @@ export function KanbanBoard({ leads, returnTo }: KanbanBoardProps) {
                         </span>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-2 gap-1.5 text-[11px] text-slate-600">
-                        <span>
-                          Score <strong className="text-slate-950">{lead.score_oportunidade ?? "-"}</strong>
+                      <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-slate-600">
+                        <span className="rounded-full bg-white px-2 py-1 font-bold ring-1 ring-black/5">
+                          Score {lead.score_oportunidade ?? "-"}
                         </span>
-                        <span>
-                          Aval. <strong className="text-slate-950">{lead.quantidade_avaliacoes ?? "-"}</strong>
-                        </span>
-                        <span className="col-span-2 truncate">{lead.whatsapp_status ?? "Verificar WhatsApp"}</span>
-                        <span className="col-span-2 truncate text-slate-400">
-                          {lead.telefone || telefoneLimpo || "Sem telefone"}
+                        <span className="rounded-full bg-white px-2 py-1 font-bold ring-1 ring-black/5">
+                          {lead.quantidade_avaliacoes ?? "-"} aval.
                         </span>
                       </div>
 
-                      <p className="mt-3 text-[11px] font-bold text-yellow-800">Abrir detalhes</p>
+                      <div className="mt-2 text-[11px] leading-4">
+                        <p className="truncate font-bold text-slate-700">{lead.whatsapp_status ?? "Verificar WhatsApp"}</p>
+                        <p className="truncate text-slate-400">{lead.telefone || telefoneLimpo || "Sem telefone"}</p>
+                      </div>
+
+                      <p className="mt-3 text-[11px] font-black text-yellow-800 opacity-80 transition group-hover:opacity-100">
+                        Abrir detalhes →
+                      </p>
                     </a>
                   );
                 })

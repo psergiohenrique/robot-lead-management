@@ -22,6 +22,15 @@ const statusOptions = [
   "Perdido",
 ];
 
+const statusAliases: Record<string, string> = {
+  "DiagnÃ³stico enviado": "Diagnóstico enviado",
+  "ReuniÃ£o marcada": "Reunião marcada",
+};
+
+function normalizeStatus(status?: string | null): string {
+  return statusAliases[status?.trim() ?? ""] ?? status?.trim() ?? "Novo";
+}
+
 export function LeadStatusForm({ leadId, status, returnTo = "/", compact = false }: LeadStatusFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
 
@@ -32,7 +41,7 @@ export function LeadStatusForm({ leadId, status, returnTo = "/", compact = false
       <select
         className="w-full rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs font-bold text-slate-700 outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100"
         name="status_contato"
-        defaultValue={status ?? "Novo"}
+        defaultValue={normalizeStatus(status)}
         onChange={() => formRef.current?.requestSubmit()}
       >
         {statusOptions.map((option) => (

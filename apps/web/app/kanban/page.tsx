@@ -53,7 +53,7 @@ export default async function KanbanPage({ searchParams }: KanbanPageProps) {
             <p className="text-sm font-bold uppercase tracking-[0.3em] text-yellow-300">Funil comercial</p>
             <h1 className="mt-4 max-w-3xl text-4xl font-black tracking-tight sm:text-5xl">Kanban de leads</h1>
             <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
-              Acompanhe os leads por etapa, abra o WhatsApp e mova oportunidades conforme a conversa evolui.
+              Acompanhe os leads por etapa, abra a ficha completa e mova oportunidades conforme a conversa evolui.
             </p>
           </div>
 
