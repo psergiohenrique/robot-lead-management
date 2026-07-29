@@ -8,6 +8,7 @@ type LeadStatusFormProps = {
   leadId: number;
   status?: string | null;
   returnTo?: string;
+  compact?: boolean;
 };
 
 const statusOptions = [
@@ -21,11 +22,11 @@ const statusOptions = [
   "Perdido",
 ];
 
-export function LeadStatusForm({ leadId, status, returnTo = "/" }: LeadStatusFormProps) {
+export function LeadStatusForm({ leadId, status, returnTo = "/", compact = false }: LeadStatusFormProps) {
   const formRef = useRef<HTMLFormElement>(null);
 
   return (
-    <form ref={formRef} action={updateLeadStatus} className="flex min-w-48 gap-2">
+    <form ref={formRef} action={updateLeadStatus} className={`flex gap-2 ${compact ? "min-w-0" : "min-w-48"}`}>
       <input type="hidden" name="lead_id" value={leadId} />
       <input type="hidden" name="return_to" value={returnTo} />
       <select
@@ -40,7 +41,11 @@ export function LeadStatusForm({ leadId, status, returnTo = "/" }: LeadStatusFor
           </option>
         ))}
       </select>
-      <button className="rounded-2xl bg-slate-950 px-3 py-2 text-xs font-black text-white transition hover:bg-slate-800">
+      <button
+        className={`rounded-2xl bg-slate-950 px-3 py-2 text-xs font-black text-white transition hover:bg-slate-800 ${
+          compact ? "sr-only" : ""
+        }`}
+      >
         Salvar
       </button>
     </form>

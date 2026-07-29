@@ -136,6 +136,24 @@ Na prática:
 
 Isso prepara o produto para mudar a lógica de busca e score por campanha nas próximas sprints.
 
+### Kanban comercial
+
+A rota `/kanban` mostra os leads em formato de funil comercial:
+
+```text
+Novo → Primeiro contato → Respondeu → Diagnóstico enviado → Reunião marcada → Proposta → Fechado → Perdido
+```
+
+Essa visão é pensada para acompanhar a operação diária de prospecção:
+
+- escolher uma campanha;
+- ver os leads separados por etapa;
+- abrir o WhatsApp manualmente;
+- mudar o status do lead direto no card;
+- voltar para a dashboard/tabela quando precisar trabalhar com filtros e paginação.
+
+O status continua sendo salvo no próprio lead. Então uma mudança feita no Kanban também aparece na tabela, e uma mudança feita na tabela também aparece no Kanban.
+
 ### Neon DB
 
 O banco será Postgres no Neon. A API espera a variável:

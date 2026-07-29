@@ -118,6 +118,14 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <p className="text-sm text-slate-300">{user.email}</p>
               <LogoutButton />
             </div>
+            <div className="mt-4">
+              <a
+                className="inline-flex rounded-2xl bg-yellow-300 px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-yellow-200"
+                href={selectedCampaignId ? `/kanban?campaign_id=${selectedCampaignId}` : "/kanban"}
+              >
+                Abrir Kanban
+              </a>
+            </div>
           </div>
         </div>
       </header>
