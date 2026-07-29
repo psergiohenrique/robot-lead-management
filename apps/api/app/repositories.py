@@ -116,7 +116,18 @@ def get_or_create_default_campaign(user_id: int) -> dict[str, Any]:
             )
             row = cursor.fetchone()
             if row:
-                return dict(row)
+                campaign = dict(row)
+                cursor.execute(
+                    """
+                    UPDATE search_batches
+                    SET campaign_id = %(campaign_id)s
+                    WHERE user_id = %(user_id)s
+                      AND campaign_id IS NULL
+                    """,
+                    {"campaign_id": campaign["id"], "user_id": user_id},
+                )
+                connection.commit()
+                return campaign
 
             cursor.execute(
                 """
@@ -136,6 +147,15 @@ def get_or_create_default_campaign(user_id: int) -> dict[str, Any]:
                 {"user_id": user_id},
             )
             campaign = dict(cursor.fetchone())
+            cursor.execute(
+                """
+                UPDATE search_batches
+                SET campaign_id = %(campaign_id)s
+                WHERE user_id = %(user_id)s
+                  AND campaign_id IS NULL
+                """,
+                {"campaign_id": campaign["id"], "user_id": user_id},
+            )
         connection.commit()
     return campaign
 
@@ -170,12 +190,10 @@ def list_campaigns(user_id: int) -> list[dict[str, Any]]:
                 SELECT
                     c.*,
                     COUNT(DISTINCT sb.id)::int AS total_lotes,
-                    COUNT(DISTINCT sbl.lead_id)::int AS total_leads,
-                    COUNT(DISTINCT sbl.lead_id) FILTER (WHERE l.sem_site_cadastrado = 'SIM')::int AS total_sem_site
+                    COALESCE(SUM(sb.total_leads), 0)::int AS total_leads,
+                    COALESCE(SUM(sb.total_sem_site), 0)::int AS total_sem_site
                 FROM campaigns c
                 LEFT JOIN search_batches sb ON sb.campaign_id = c.id
-                LEFT JOIN search_batch_leads sbl ON sbl.batch_id = sb.id
-                LEFT JOIN leads l ON l.id = sbl.lead_id
                 WHERE c.user_id = %(user_id)s
                 GROUP BY c.id
                 ORDER BY
@@ -265,11 +283,21 @@ def list_leads(
             """
             EXISTS (
                 SELECT 1
-                FROM search_batch_leads campaign_sbl
-                INNER JOIN search_batches campaign_sb ON campaign_sb.id = campaign_sbl.batch_id
-                WHERE campaign_sbl.lead_id = l.id
-                  AND campaign_sb.campaign_id = %(campaign_id)s
+                FROM search_batches campaign_sb
+                LEFT JOIN search_batch_leads campaign_sbl
+                    ON campaign_sbl.batch_id = campaign_sb.id
+                    AND campaign_sbl.lead_id = l.id
+                LEFT JOIN search_batch_items campaign_sbi
+                    ON campaign_sbi.batch_id = campaign_sb.id
+                WHERE campaign_sb.campaign_id = %(campaign_id)s
                   AND campaign_sb.user_id = %(user_id)s
+                  AND (
+                    campaign_sbl.lead_id IS NOT NULL
+                    OR (
+                        lower(COALESCE(l.cidade, '')) = lower(COALESCE(campaign_sbi.cidade, ''))
+                        AND lower(COALESCE(l.segmento, '')) = lower(COALESCE(campaign_sbi.segmento, ''))
+                    )
+                  )
             )
             """
         )
