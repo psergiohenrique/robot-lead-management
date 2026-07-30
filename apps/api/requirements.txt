@@ -6,3 +6,4 @@ pydantic[email]>=2.8,<3
 pydantic-settings>=2.4,<3
 requests>=2.32,<3
 openpyxl>=3.1,<4
+python-multipart>=0.0.9,<1

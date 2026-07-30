@@ -6,7 +6,7 @@ import { redirect } from "next/navigation";
 
 import { getSessionToken } from "./auth";
 import { SESSION_COOKIE } from "./constants";
-import type { CampaignSummary, SearchBatchResult } from "./types";
+import type { CampaignSummary, ImportLeadsResult, SearchBatchResult } from "./types";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8000";
 
@@ -16,6 +16,11 @@ export type RunSearchState = {
 };
 
 export type CreateCampaignState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
+
+export type ImportLeadsState = {
   status: "idle" | "success" | "error";
   message: string;
 };
@@ -118,6 +123,52 @@ export async function createCampaign(
     return { status: "success", message: `Campanha "${campaign.nome}" criada com sucesso.` };
   } catch {
     return { status: "error", message: "Não foi possível conectar à API." };
+  }
+}
+
+export async function importLeadsFile(
+  _prevState: ImportLeadsState,
+  formData: FormData
+): Promise<ImportLeadsState> {
+  const file = formData.get("file");
+  const campaignId = String(formData.get("campaign_id") ?? "").trim();
+
+  if (!(file instanceof File) || !file.name) {
+    return { status: "error", message: "Selecione uma planilha .xlsx." };
+  }
+
+  const token = await getSessionToken();
+  if (!token) {
+    return { status: "error", message: "Sessão expirada. Faça login novamente." };
+  }
+
+  const payload = new FormData();
+  payload.set("file", file);
+  if (campaignId) payload.set("campaign_id", campaignId);
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/imports/leads`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+      },
+      body: payload,
+      cache: "no-store",
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const detail = typeof data?.detail === "string" ? data.detail : "Falha ao importar a planilha.";
+      return { status: "error", message: detail };
+    }
+
+    const resultado = data as ImportLeadsResult;
+    revalidatePath("/");
+    revalidatePath("/kanban");
+    return { status: "success", message: resultado.message };
+  } catch {
+    return { status: "error", message: "Não foi possível conectar à API para importar a planilha." };
   }
 }
 

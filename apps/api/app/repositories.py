@@ -609,3 +609,181 @@ def list_search_batches(user_id: int, limit: int = 20, campaign_id: int | None =
                 {"user_id": user_id, "limit": limit, "campaign_id": campaign_id},
             )
             return [dict(row) for row in cursor.fetchall()]
+
+
+def importar_leads_planilha(
+    *,
+    user_id: int,
+    leads: list[dict[str, Any]],
+    nome_arquivo: str,
+    campaign_id: int | None = None,
+) -> dict[str, Any]:
+    if not database_configured():
+        raise RuntimeError("DATABASE_URL não configurada.")
+
+    ensure_campaigns_table()
+    ensure_search_batch_leads_table()
+
+    campaign = get_campaign(campaign_id, user_id) if campaign_id else get_or_create_default_campaign(user_id)
+    if campaign_id and not campaign:
+        raise RuntimeError("Campanha não encontrada para este usuário.")
+    final_campaign_id = campaign["id"]
+
+    total_sem_site = sum(1 for lead in leads if lead.get("sem_site_cadastrado") == "SIM")
+    novos = 0
+    atualizados = 0
+    ignorados = 0
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                INSERT INTO search_batches (
+                    user_id, campaign_id, nome_lote, status, prioridade,
+                    total_planejado, total_processado, total_leads, total_sem_site,
+                    started_at, finished_at
+                )
+                VALUES (
+                    %(user_id)s, %(campaign_id)s, %(nome_lote)s, 'done', 'Importação',
+                    %(total)s, %(total)s, %(total)s, %(total_sem_site)s,
+                    now(), now()
+                )
+                RETURNING id
+                """,
+                {
+                    "user_id": user_id,
+                    "campaign_id": final_campaign_id,
+                    "nome_lote": f"Importação: {nome_arquivo}",
+                    "total": len(leads),
+                    "total_sem_site": total_sem_site,
+                },
+            )
+            batch_id = cursor.fetchone()["id"]
+
+            for lead in leads:
+                if not lead.get("nome") or not lead.get("place_id"):
+                    ignorados += 1
+                    continue
+
+                values = {
+                    "user_id": user_id,
+                    "place_id": lead.get("place_id"),
+                    "nome": lead.get("nome"),
+                    "telefone": lead.get("telefone"),
+                    "telefone_limpo": lead.get("telefone_limpo"),
+                    "whatsapp_status": lead.get("whatsapp_status"),
+                    "endereco": lead.get("endereco"),
+                    "cidade": lead.get("cidade"),
+                    "segmento": lead.get("segmento"),
+                    "regiao": lead.get("regiao"),
+                    "google_maps_url": lead.get("google_maps_url"),
+                    "avaliacao": lead.get("avaliacao"),
+                    "quantidade_avaliacoes": lead.get("quantidade_avaliacoes"),
+                    "site_cadastrado": lead.get("site_cadastrado"),
+                    "sem_site_cadastrado": lead.get("sem_site_cadastrado"),
+                    "business_status": lead.get("business_status"),
+                    "score_oportunidade": lead.get("score_oportunidade"),
+                    "classificacao_lead": lead.get("classificacao_lead"),
+                    "prioridade": lead.get("prioridade"),
+                    "oferta_principal": lead.get("oferta_principal"),
+                    "observacao_comercial": lead.get("observacao_comercial"),
+                    "status_contato": lead.get("status_contato") or "Novo",
+                    "respondeu": lead.get("respondeu") if lead.get("respondeu") is not None else False,
+                    "interesse": lead.get("interesse"),
+                    "diagnostico_enviado": lead.get("diagnostico_enviado")
+                    if lead.get("diagnostico_enviado") is not None
+                    else False,
+                    "reuniao_marcada": lead.get("reuniao_marcada")
+                    if lead.get("reuniao_marcada") is not None
+                    else False,
+                    "proposta_enviada": lead.get("proposta_enviada")
+                    if lead.get("proposta_enviada") is not None
+                    else False,
+                    "fechado": lead.get("fechado") if lead.get("fechado") is not None else False,
+                    "motivo_perda": lead.get("motivo_perda"),
+                    "observacao_humana": lead.get("observacao_humana"),
+                }
+
+                cursor.execute(
+                    """
+                    INSERT INTO leads (
+                        user_id, place_id, nome, telefone, telefone_limpo, whatsapp_status,
+                        endereco, cidade, segmento, regiao, google_maps_url, avaliacao,
+                        quantidade_avaliacoes, site_cadastrado, sem_site_cadastrado,
+                        business_status, score_oportunidade, classificacao_lead, prioridade,
+                        oferta_principal, observacao_comercial, status_contato,
+                        respondeu, interesse, diagnostico_enviado, reuniao_marcada,
+                        proposta_enviada, fechado, motivo_perda, observacao_humana
+                    ) VALUES (
+                        %(user_id)s, %(place_id)s, %(nome)s, %(telefone)s, %(telefone_limpo)s, %(whatsapp_status)s,
+                        %(endereco)s, %(cidade)s, %(segmento)s, %(regiao)s, %(google_maps_url)s, %(avaliacao)s,
+                        %(quantidade_avaliacoes)s, %(site_cadastrado)s, %(sem_site_cadastrado)s,
+                        %(business_status)s, %(score_oportunidade)s, %(classificacao_lead)s, %(prioridade)s,
+                        %(oferta_principal)s, %(observacao_comercial)s, %(status_contato)s,
+                        %(respondeu)s, %(interesse)s, %(diagnostico_enviado)s, %(reuniao_marcada)s,
+                        %(proposta_enviada)s, %(fechado)s, %(motivo_perda)s, %(observacao_humana)s
+                    )
+                    ON CONFLICT (user_id, place_id) DO UPDATE SET
+                        nome = EXCLUDED.nome,
+                        telefone = COALESCE(EXCLUDED.telefone, leads.telefone),
+                        telefone_limpo = COALESCE(EXCLUDED.telefone_limpo, leads.telefone_limpo),
+                        whatsapp_status = COALESCE(EXCLUDED.whatsapp_status, leads.whatsapp_status),
+                        endereco = COALESCE(EXCLUDED.endereco, leads.endereco),
+                        cidade = COALESCE(EXCLUDED.cidade, leads.cidade),
+                        segmento = COALESCE(EXCLUDED.segmento, leads.segmento),
+                        regiao = COALESCE(EXCLUDED.regiao, leads.regiao),
+                        google_maps_url = COALESCE(EXCLUDED.google_maps_url, leads.google_maps_url),
+                        avaliacao = COALESCE(EXCLUDED.avaliacao, leads.avaliacao),
+                        quantidade_avaliacoes = COALESCE(EXCLUDED.quantidade_avaliacoes, leads.quantidade_avaliacoes),
+                        site_cadastrado = COALESCE(EXCLUDED.site_cadastrado, leads.site_cadastrado),
+                        sem_site_cadastrado = COALESCE(EXCLUDED.sem_site_cadastrado, leads.sem_site_cadastrado),
+                        business_status = COALESCE(EXCLUDED.business_status, leads.business_status),
+                        score_oportunidade = COALESCE(EXCLUDED.score_oportunidade, leads.score_oportunidade),
+                        classificacao_lead = COALESCE(EXCLUDED.classificacao_lead, leads.classificacao_lead),
+                        prioridade = COALESCE(EXCLUDED.prioridade, leads.prioridade),
+                        oferta_principal = COALESCE(EXCLUDED.oferta_principal, leads.oferta_principal),
+                        observacao_comercial = COALESCE(leads.observacao_comercial, EXCLUDED.observacao_comercial),
+                        status_contato = CASE
+                            WHEN COALESCE(leads.status_contato, 'Novo') = 'Novo'
+                             AND COALESCE(EXCLUDED.status_contato, 'Novo') <> 'Novo'
+                            THEN EXCLUDED.status_contato
+                            ELSE leads.status_contato
+                        END,
+                        respondeu = leads.respondeu OR EXCLUDED.respondeu,
+                        diagnostico_enviado = leads.diagnostico_enviado OR EXCLUDED.diagnostico_enviado,
+                        reuniao_marcada = leads.reuniao_marcada OR EXCLUDED.reuniao_marcada,
+                        proposta_enviada = leads.proposta_enviada OR EXCLUDED.proposta_enviada,
+                        fechado = leads.fechado OR EXCLUDED.fechado,
+                        interesse = COALESCE(leads.interesse, EXCLUDED.interesse),
+                        motivo_perda = COALESCE(leads.motivo_perda, EXCLUDED.motivo_perda),
+                        observacao_humana = COALESCE(leads.observacao_humana, EXCLUDED.observacao_humana),
+                        updated_at = now()
+                    RETURNING id, (xmax = 0) AS inserted
+                    """,
+                    values,
+                )
+                row = cursor.fetchone()
+                if row and row["inserted"]:
+                    novos += 1
+                else:
+                    atualizados += 1
+                if row:
+                    cursor.execute(
+                        """
+                        INSERT INTO search_batch_leads (batch_id, lead_id)
+                        VALUES (%(batch_id)s, %(lead_id)s)
+                        ON CONFLICT (batch_id, lead_id) DO NOTHING
+                        """,
+                        {"batch_id": batch_id, "lead_id": row["id"]},
+                    )
+
+        connection.commit()
+
+    return {
+        "batch_id": batch_id,
+        "total_processado": len(leads),
+        "total_sem_site": total_sem_site,
+        "novos_leads": novos,
+        "leads_atualizados": atualizados,
+        "ignorados": ignorados,
+    }

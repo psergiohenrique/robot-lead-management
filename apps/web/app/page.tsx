@@ -1,5 +1,6 @@
 import { CampaignsPanel } from "@/components/campaigns-panel";
 import { LeadBaseTabs } from "@/components/lead-base-tabs";
+import { ImportLeadsForm } from "@/components/import-leads-form";
 import { LeadsFilters } from "@/components/leads-filters";
 import { LeadsTable } from "@/components/leads-table";
 import { LogoutButton } from "@/components/logout-button";
@@ -148,9 +149,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
 
       <CampaignsPanel campaigns={campaigns} activeCampaignId={selectedCampaignId} />
 
-      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+      <section className="grid gap-6 xl:grid-cols-3">
         <div className="rounded-[2rem] bg-white p-6 shadow-soft ring-1 ring-black/5">
-          <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
+          <div className="grid gap-6 lg:items-start">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Coleta de leads</p>
               <h2 className="mt-2 text-3xl font-black text-slate-950">Buscar novos leads</h2>
@@ -164,7 +165,21 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
 
         <div className="rounded-[2rem] bg-white p-6 shadow-soft ring-1 ring-black/5">
-          <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+          <div className="grid gap-6 lg:items-start">
+            <div>
+              <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Importação</p>
+              <h2 className="mt-2 text-3xl font-black text-slate-950">Trazer planilha</h2>
+              <p className="mt-3 text-sm leading-6 text-slate-500">
+                Importe uma planilha .xlsx do Drive ou do computador. Os leads entram na base geral, sem duplicar
+                empresas já cadastradas.
+              </p>
+            </div>
+            <ImportLeadsForm campaigns={campaigns} activeCampaignId={selectedCampaignId} />
+          </div>
+        </div>
+
+        <div className="rounded-[2rem] bg-white p-6 shadow-soft ring-1 ring-black/5">
+          <div className="grid gap-6 lg:items-start">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Mensagem atual</p>
               <h2 className="mt-2 text-3xl font-black text-slate-950">Promoção Codepath</h2>

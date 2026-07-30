@@ -1,16 +1,18 @@
 from __future__ import annotations
 
-from fastapi import Depends, FastAPI, HTTPException, Query
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.auth import get_current_user, request_magic_link, verify_magic_link
 from app.config import get_settings
 from app.db import database_configured
+from app.importer import extrair_leads_xlsx
 from app.repositories import (
     create_campaign,
     criar_e_executar_lote,
     get_dashboard_summary,
     get_lead,
+    importar_leads_planilha,
     list_campaigns,
     list_leads,
     list_search_batches,
@@ -22,6 +24,7 @@ from app.schemas import (
     CampaignSummary,
     DashboardSummary,
     HealthResponse,
+    ImportLeadsResult,
     LeadListResponse,
     LeadUpdate,
     MagicLinkRequest,
@@ -165,6 +168,46 @@ def create_search_batch(
     except RuntimeError as erro:
         raise HTTPException(status_code=502, detail=str(erro)) from erro
     return SearchBatchResult(**resultado)
+
+
+@app.post("/imports/leads", response_model=ImportLeadsResult, status_code=201)
+async def import_leads(
+    file: UploadFile = File(...),
+    campaign_id: int | None = Form(default=None),
+    current_user: dict = Depends(get_current_user),
+) -> ImportLeadsResult:
+    filename = file.filename or "planilha.xlsx"
+    if not filename.lower().endswith(".xlsx"):
+        raise HTTPException(status_code=400, detail="Envie uma planilha .xlsx.")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="A planilha enviada está vazia.")
+
+    try:
+        leads = extrair_leads_xlsx(content)
+        if not leads:
+            raise RuntimeError("Não encontrei leads válidos na planilha.")
+        resultado = importar_leads_planilha(
+            user_id=current_user["id"],
+            leads=leads,
+            nome_arquivo=filename,
+            campaign_id=campaign_id,
+        )
+    except RuntimeError as erro:
+        raise HTTPException(status_code=502, detail=str(erro)) from erro
+    except Exception as erro:
+        raise HTTPException(status_code=400, detail="Não consegui ler essa planilha. Confira o formato.") from erro
+
+    return ImportLeadsResult(
+        **resultado,
+        message=(
+            f"{resultado['total_processado']} lead(s) importado(s): "
+            f"{resultado['novos_leads']} novo(s), "
+            f"{resultado['leads_atualizados']} atualizado(s), "
+            f"{resultado['total_sem_site']} sem site."
+        ),
+    )
 
 
 @app.get("/search-batches", response_model=list[SearchBatchSummary])

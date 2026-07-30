@@ -75,6 +75,16 @@ export type SearchBatchResult = {
   message: string;
 };
 
+export type ImportLeadsResult = {
+  batch_id: number;
+  total_processado: number;
+  total_sem_site: number;
+  novos_leads: number;
+  leads_atualizados: number;
+  ignorados: number;
+  message: string;
+};
+
 export type SearchBatchSummary = {
   id: number;
   campaign_id?: number | null;

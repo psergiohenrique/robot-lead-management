@@ -135,6 +135,16 @@ class SearchBatchResult(BaseModel):
     message: str
 
 
+class ImportLeadsResult(BaseModel):
+    batch_id: int
+    total_processado: int
+    total_sem_site: int
+    novos_leads: int
+    leads_atualizados: int
+    ignorados: int = 0
+    message: str
+
+
 class SearchBatchSummary(BaseModel):
     id: int
     campaign_id: int | None = None
