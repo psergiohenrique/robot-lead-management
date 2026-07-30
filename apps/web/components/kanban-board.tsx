@@ -21,8 +21,10 @@ const columns = [
 const statusAliases: Record<string, string> = {
   "DiagnÃ³stico enviado": "Diagnóstico enviado",
   "DiagnÃƒÂ³stico enviado": "Diagnóstico enviado",
+  "DiagnÃƒÆ’Ã‚Â³stico enviado": "Diagnóstico enviado",
   "ReuniÃ£o marcada": "Reunião marcada",
   "ReuniÃƒÂ£o marcada": "Reunião marcada",
+  "ReuniÃƒÆ’Ã‚Â£o marcada": "Reunião marcada",
 };
 
 type KanbanBoardProps = {
@@ -63,16 +65,26 @@ export function KanbanBoard({ leads, returnTo }: KanbanBoardProps) {
 
   return (
     <>
-      <div className="overflow-x-auto pb-3">
-        <div className="grid min-w-[1320px] grid-cols-8 gap-3">
+      <div className="-mx-5 overflow-x-auto px-5 pb-5 sm:-mx-8 sm:px-8">
+        <div className="flex min-w-max gap-4">
           {grouped.map((group) => (
-            <section key={group.title} className="rounded-[1.35rem] bg-white p-3 shadow-soft ring-1 ring-black/5">
-              <div className="sticky top-0 z-10 rounded-t-[1.1rem] bg-white pb-3">
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-slate-400">{group.title}</p>
-                <p className="mt-1 text-2xl font-black text-slate-950">{group.leads.length}</p>
+            <section
+              key={group.title}
+              className="flex max-h-[calc(100vh-260px)] w-[300px] shrink-0 flex-col rounded-[1.5rem] bg-white p-4 shadow-soft ring-1 ring-black/5"
+            >
+              <div className="border-b border-slate-100 pb-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{group.title}</p>
+                    <p className="mt-1 text-xs font-bold text-slate-400">Etapa do funil</p>
+                  </div>
+                  <span className="rounded-2xl bg-slate-950 px-3 py-1.5 text-sm font-black text-white">
+                    {group.leads.length}
+                  </span>
+                </div>
               </div>
 
-              <div className="mt-1 flex max-h-[720px] flex-col gap-2 overflow-y-auto pr-1">
+              <div className="mt-3 flex flex-1 flex-col gap-3 overflow-y-auto pr-1">
                 {group.leads.length ? (
                   group.leads.map((lead) => {
                     const telefoneLimpo = limparTelefoneBrasil(lead);
@@ -82,17 +94,17 @@ export function KanbanBoard({ leads, returnTo }: KanbanBoardProps) {
                         key={lead.id ?? lead.nome}
                         type="button"
                         onClick={() => setSelectedLead(lead)}
-                        className="group block w-full rounded-2xl bg-slate-50 p-3 text-left ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:bg-yellow-50 hover:shadow-soft"
+                        className="group block w-full rounded-2xl bg-slate-50 p-4 text-left ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:bg-yellow-50 hover:shadow-soft"
                       >
-                        <div className="flex items-start justify-between gap-2">
+                        <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <p className="line-clamp-2 text-[13px] font-black leading-5 text-slate-950">{lead.nome}</p>
-                            <p className="mt-1 truncate text-xs text-slate-500">
+                            <p className="line-clamp-3 text-sm font-black leading-5 text-slate-950">{lead.nome}</p>
+                            <p className="mt-2 line-clamp-2 text-xs leading-4 text-slate-500">
                               {lead.cidade ?? "-"} · {lead.segmento ?? "-"}
                             </p>
                           </div>
                           <span
-                            className={`shrink-0 rounded-full px-2 py-1 text-[9px] font-black ${scoreTone(
+                            className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-black ${scoreTone(
                               lead.classificacao_lead
                             )}`}
                           >
@@ -100,30 +112,30 @@ export function KanbanBoard({ leads, returnTo }: KanbanBoardProps) {
                           </span>
                         </div>
 
-                        <div className="mt-3 flex items-center justify-between gap-2 text-[11px] text-slate-600">
-                          <span className="rounded-full bg-white px-2 py-1 font-bold ring-1 ring-black/5">
-                            Score {lead.score_oportunidade ?? "-"}
-                          </span>
-                          <span className="rounded-full bg-white px-2 py-1 font-bold ring-1 ring-black/5">
-                            {lead.quantidade_avaliacoes ?? "-"} aval.
-                          </span>
+                        <div className="mt-4 grid grid-cols-2 gap-2 text-xs text-slate-600">
+                          <div className="rounded-2xl bg-white px-3 py-2 ring-1 ring-black/5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Score</p>
+                            <p className="mt-1 font-black text-slate-950">{lead.score_oportunidade ?? "-"}</p>
+                          </div>
+                          <div className="rounded-2xl bg-white px-3 py-2 ring-1 ring-black/5">
+                            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">Avaliações</p>
+                            <p className="mt-1 font-black text-slate-950">{lead.quantidade_avaliacoes ?? "-"}</p>
+                          </div>
                         </div>
 
-                        <div className="mt-2 text-[11px] leading-4">
-                          <p className="truncate font-bold text-slate-700">
-                            {lead.whatsapp_status ?? "Verificar WhatsApp"}
-                          </p>
-                          <p className="truncate text-slate-400">{lead.telefone || telefoneLimpo || "Sem telefone"}</p>
+                        <div className="mt-3 rounded-2xl bg-white px-3 py-2 text-xs leading-5 ring-1 ring-black/5">
+                          <p className="font-black text-slate-700">{lead.whatsapp_status ?? "Verificar WhatsApp"}</p>
+                          <p className="mt-0.5 truncate text-slate-400">{lead.telefone || telefoneLimpo || "Sem telefone"}</p>
                         </div>
 
-                        <p className="mt-3 text-[11px] font-black text-yellow-800 opacity-80 transition group-hover:opacity-100">
+                        <p className="mt-3 text-xs font-black text-yellow-800 opacity-80 transition group-hover:opacity-100">
                           Abrir detalhes →
                         </p>
                       </button>
                     );
                   })
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-slate-200 p-4 text-center text-xs font-bold text-slate-400">
+                  <div className="rounded-2xl border border-dashed border-slate-200 p-5 text-center text-sm font-bold text-slate-400">
                     Sem leads nesta etapa
                   </div>
                 )}
