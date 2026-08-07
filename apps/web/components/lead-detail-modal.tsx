@@ -111,6 +111,8 @@ export function LeadDetailModal({ lead, returnTo, onClose }: LeadDetailModalProp
                 <InfoItem label="Classificação" value={lead.classificacao_lead} />
                 <InfoItem label="Score" value={lead.score_oportunidade} />
                 <InfoItem label="Prioridade" value={lead.prioridade} />
+                <InfoItem label="Primeiro contato" value={formatDate(lead.data_primeiro_contato)} />
+                <InfoItem label="Último contato" value={formatDate(lead.data_ultimo_contato)} />
                 <InfoItem label="Próximo follow-up" value={lead.proximo_followup} />
                 <InfoItem label="Atualizado em" value={formatDate(lead.updated_at)} />
               </div>

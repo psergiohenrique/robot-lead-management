@@ -67,6 +67,8 @@ class Lead(BaseModel):
     classificacao_lead: str | None = None
     prioridade: str | None = None
     status_contato: str | None = None
+    data_primeiro_contato: date | None = None
+    data_ultimo_contato: date | None = None
     proximo_followup: date | None = None
     updated_at: datetime | None = None
 

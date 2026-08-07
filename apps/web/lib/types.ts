@@ -34,6 +34,8 @@ export type Lead = {
   classificacao_lead?: string | null;
   prioridade?: string | null;
   status_contato?: string | null;
+  data_primeiro_contato?: string | null;
+  data_ultimo_contato?: string | null;
   proximo_followup?: string | null;
   oferta_principal?: string | null;
   observacao_comercial?: string | null;

@@ -340,7 +340,8 @@ def list_leads(
                     l.endereco, l.cidade, l.segmento, l.regiao, l.google_maps_url, l.avaliacao,
                     l.quantidade_avaliacoes, l.site_cadastrado, l.sem_site_cadastrado,
                     l.score_oportunidade, l.classificacao_lead, l.prioridade,
-                    l.status_contato, l.proximo_followup, l.updated_at
+                    l.status_contato, l.data_primeiro_contato, l.data_ultimo_contato,
+                    l.proximo_followup, l.updated_at
                 FROM {from_clause}
                 {where}
                 ORDER BY
@@ -688,6 +689,9 @@ def importar_leads_planilha(
                     "oferta_principal": lead.get("oferta_principal"),
                     "observacao_comercial": lead.get("observacao_comercial"),
                     "status_contato": lead.get("status_contato") or "Novo",
+                    "data_primeiro_contato": lead.get("data_primeiro_contato"),
+                    "data_ultimo_contato": lead.get("data_ultimo_contato"),
+                    "proximo_followup": lead.get("proximo_followup"),
                     "respondeu": lead.get("respondeu") if lead.get("respondeu") is not None else False,
                     "interesse": lead.get("interesse"),
                     "diagnostico_enviado": lead.get("diagnostico_enviado")
@@ -712,6 +716,7 @@ def importar_leads_planilha(
                         quantidade_avaliacoes, site_cadastrado, sem_site_cadastrado,
                         business_status, score_oportunidade, classificacao_lead, prioridade,
                         oferta_principal, observacao_comercial, status_contato,
+                        data_primeiro_contato, data_ultimo_contato, proximo_followup,
                         respondeu, interesse, diagnostico_enviado, reuniao_marcada,
                         proposta_enviada, fechado, motivo_perda, observacao_humana
                     ) VALUES (
@@ -720,6 +725,7 @@ def importar_leads_planilha(
                         %(quantidade_avaliacoes)s, %(site_cadastrado)s, %(sem_site_cadastrado)s,
                         %(business_status)s, %(score_oportunidade)s, %(classificacao_lead)s, %(prioridade)s,
                         %(oferta_principal)s, %(observacao_comercial)s, %(status_contato)s,
+                        %(data_primeiro_contato)s, %(data_ultimo_contato)s, %(proximo_followup)s,
                         %(respondeu)s, %(interesse)s, %(diagnostico_enviado)s, %(reuniao_marcada)s,
                         %(proposta_enviada)s, %(fechado)s, %(motivo_perda)s, %(observacao_humana)s
                     )
@@ -744,11 +750,13 @@ def importar_leads_planilha(
                         oferta_principal = COALESCE(EXCLUDED.oferta_principal, leads.oferta_principal),
                         observacao_comercial = COALESCE(leads.observacao_comercial, EXCLUDED.observacao_comercial),
                         status_contato = CASE
-                            WHEN COALESCE(leads.status_contato, 'Novo') = 'Novo'
-                             AND COALESCE(EXCLUDED.status_contato, 'Novo') <> 'Novo'
+                            WHEN COALESCE(EXCLUDED.status_contato, 'Novo') <> 'Novo'
                             THEN EXCLUDED.status_contato
                             ELSE leads.status_contato
                         END,
+                        data_primeiro_contato = COALESCE(leads.data_primeiro_contato, EXCLUDED.data_primeiro_contato),
+                        data_ultimo_contato = COALESCE(EXCLUDED.data_ultimo_contato, leads.data_ultimo_contato),
+                        proximo_followup = COALESCE(EXCLUDED.proximo_followup, leads.proximo_followup),
                         respondeu = leads.respondeu OR EXCLUDED.respondeu,
                         diagnostico_enviado = leads.diagnostico_enviado OR EXCLUDED.diagnostico_enviado,
                         reuniao_marcada = leads.reuniao_marcada OR EXCLUDED.reuniao_marcada,

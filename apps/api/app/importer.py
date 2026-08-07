@@ -3,17 +3,21 @@ from __future__ import annotations
 import hashlib
 import re
 import unicodedata
+from datetime import date, datetime
 from io import BytesIO
 from typing import Any
 
 from openpyxl import load_workbook
 
 
-def _normalizar_coluna(value: Any) -> str:
+def _normalizar_texto(value: Any) -> str:
     texto = str(value or "").strip().lower()
     texto = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode("ascii")
-    texto = re.sub(r"[^a-z0-9]+", "_", texto).strip("_")
-    return texto
+    return re.sub(r"[^a-z0-9]+", "_", texto).strip("_")
+
+
+def _normalizar_coluna(value: Any) -> str:
+    return _normalizar_texto(value)
 
 
 COLUNAS: dict[str, str] = {
@@ -46,8 +50,17 @@ COLUNAS: dict[str, str] = {
     "segmento": "segmento",
     "oferta_principal": "oferta_principal",
     "observacao_comercial": "observacao_comercial",
+    "status": "status_contato",
     "status_contato": "status_contato",
+    "status_do_contato": "status_contato",
+    "etapa": "status_contato",
+    "etapa_funil": "status_contato",
+    "data_primeiro_contato": "data_primeiro_contato",
+    "primeiro_contato": "data_primeiro_contato",
+    "data_ultimo_contato": "data_ultimo_contato",
+    "ultimo_contato": "data_ultimo_contato",
     "proximo_followup": "proximo_followup",
+    "proximo_follow_up": "proximo_followup",
     "respondeu": "respondeu",
     "interesse": "interesse",
     "diagnostico_enviado": "diagnostico_enviado",
@@ -58,6 +71,33 @@ COLUNAS: dict[str, str] = {
     "observacao_humana": "observacao_humana",
     "place_id": "place_id",
     "business_status": "business_status",
+}
+
+
+STATUS_ALIASES: dict[str, str] = {
+    "novo": "Novo",
+    "nao_contatado": "Novo",
+    "sem_contato": "Novo",
+    "contactado": "Primeiro contato",
+    "contatado": "Primeiro contato",
+    "contatada": "Primeiro contato",
+    "contato_feito": "Primeiro contato",
+    "primeiro_contato": "Primeiro contato",
+    "1_contato": "Primeiro contato",
+    "abordado": "Primeiro contato",
+    "abordagem_feita": "Primeiro contato",
+    "respondeu": "Respondeu",
+    "respondido": "Respondeu",
+    "com_resposta": "Respondeu",
+    "diagnostico": "Diagnóstico enviado",
+    "diagnostico_enviado": "Diagnóstico enviado",
+    "reuniao": "Reunião marcada",
+    "reuniao_marcada": "Reunião marcada",
+    "proposta": "Proposta",
+    "proposta_enviada": "Proposta",
+    "fechado": "Fechado",
+    "cliente_fechado": "Fechado",
+    "perdido": "Perdido",
 }
 
 
@@ -89,12 +129,36 @@ def _decimal(value: Any) -> float | None:
 def _booleano(value: Any) -> bool | None:
     if value is None or value == "":
         return None
-    texto = str(value).strip().lower()
+    texto = _normalizar_texto(value)
     if texto in {"sim", "s", "yes", "true", "1"}:
         return True
-    if texto in {"nao", "não", "n", "no", "false", "0"}:
+    if texto in {"nao", "n", "no", "false", "0"}:
         return False
     return None
+
+
+def _data(value: Any) -> date | None:
+    if value is None or value == "":
+        return None
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+
+    texto = str(value).strip()
+    for formato in ("%d/%m/%Y", "%Y-%m-%d", "%d-%m-%Y", "%d/%m/%y"):
+        try:
+            return datetime.strptime(texto, formato).date()
+        except ValueError:
+            continue
+    return None
+
+
+def _status(value: Any) -> str | None:
+    texto = _texto(value)
+    if not texto:
+        return None
+    return STATUS_ALIASES.get(_normalizar_texto(texto), texto)
 
 
 def _somente_numeros(value: str | None) -> str:
@@ -137,6 +201,25 @@ def _place_id(row: dict[str, Any]) -> str:
     return f"import:{hashlib.sha1(base.encode('utf-8')).hexdigest()}"
 
 
+def _inferir_status(cleaned: dict[str, Any]) -> str:
+    status = _status(cleaned.get("status_contato"))
+    if status:
+        return status
+    if cleaned.get("fechado"):
+        return "Fechado"
+    if cleaned.get("proposta_enviada"):
+        return "Proposta"
+    if cleaned.get("reuniao_marcada"):
+        return "Reunião marcada"
+    if cleaned.get("diagnostico_enviado"):
+        return "Diagnóstico enviado"
+    if cleaned.get("respondeu"):
+        return "Respondeu"
+    if cleaned.get("data_primeiro_contato") or cleaned.get("data_ultimo_contato"):
+        return "Primeiro contato"
+    return "Novo"
+
+
 def _limpar_row(row: dict[str, Any]) -> dict[str, Any]:
     texto_fields = {
         "place_id",
@@ -156,7 +239,6 @@ def _limpar_row(row: dict[str, Any]) -> dict[str, Any]:
         "prioridade",
         "oferta_principal",
         "observacao_comercial",
-        "status_contato",
         "interesse",
         "motivo_perda",
         "observacao_humana",
@@ -164,17 +246,22 @@ def _limpar_row(row: dict[str, Any]) -> dict[str, Any]:
     int_fields = {"quantidade_avaliacoes", "score_oportunidade"}
     decimal_fields = {"avaliacao"}
     bool_fields = {"respondeu", "diagnostico_enviado", "reuniao_marcada", "proposta_enviada", "fechado"}
+    date_fields = {"data_primeiro_contato", "data_ultimo_contato", "proximo_followup"}
 
     cleaned: dict[str, Any] = {}
     for field, value in row.items():
         if field in texto_fields:
             cleaned[field] = _texto(value)
+        elif field == "status_contato":
+            cleaned[field] = _status(value)
         elif field in int_fields:
             cleaned[field] = _inteiro(value)
         elif field in decimal_fields:
             cleaned[field] = _decimal(value)
         elif field in bool_fields:
             cleaned[field] = _booleano(value)
+        elif field in date_fields:
+            cleaned[field] = _data(value)
         else:
             cleaned[field] = value
 
@@ -183,7 +270,7 @@ def _limpar_row(row: dict[str, Any]) -> dict[str, Any]:
     cleaned["sem_site_cadastrado"] = cleaned.get("sem_site_cadastrado") or (
         "SIM" if not cleaned.get("site_cadastrado") else "NÃO"
     )
-    cleaned["status_contato"] = cleaned.get("status_contato") or "Novo"
+    cleaned["status_contato"] = _inferir_status(cleaned)
     cleaned["place_id"] = _place_id(cleaned)
     return cleaned
 
