@@ -4,6 +4,7 @@ from typing import Any
 
 from app.config import get_settings
 from app.db import database_configured, get_connection
+from app.importer import normalizar_status_contato
 from app.places import buscar_lugares, montar_lead
 
 
@@ -63,6 +64,12 @@ def ensure_campaigns_table() -> None:
                 "CREATE INDEX IF NOT EXISTS idx_search_batches_campaign_id ON search_batches (campaign_id)"
             )
         connection.commit()
+
+
+def _normalizar_lead_saida(lead: dict[str, Any]) -> dict[str, Any]:
+    if lead.get("status_contato"):
+        lead["status_contato"] = normalizar_status_contato(lead.get("status_contato"))
+    return lead
 
 
 def create_campaign(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
@@ -358,7 +365,7 @@ def list_leads(
                 """,
                 params,
             )
-            return [dict(row) for row in cursor.fetchall()], total
+            return [_normalizar_lead_saida(dict(row)) for row in cursor.fetchall()], total
 
 
 def update_lead_contact(lead_id: int, user_id: int, payload: dict[str, Any]) -> dict[str, Any] | None:
@@ -398,7 +405,7 @@ def update_lead_contact(lead_id: int, user_id: int, payload: dict[str, Any]) -> 
             )
             row = cursor.fetchone()
             connection.commit()
-            return dict(row) if row else None
+            return _normalizar_lead_saida(dict(row)) if row else None
 
 
 def get_lead(lead_id: int, user_id: int) -> dict[str, Any] | None:

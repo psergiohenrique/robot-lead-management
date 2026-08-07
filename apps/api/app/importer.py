@@ -79,12 +79,21 @@ STATUS_ALIASES: dict[str, str] = {
     "nao_contatado": "Novo",
     "sem_contato": "Novo",
     "contactado": "Primeiro contato",
+    "contactada": "Primeiro contato",
+    "contactados": "Primeiro contato",
+    "contactadas": "Primeiro contato",
     "contatado": "Primeiro contato",
     "contatada": "Primeiro contato",
+    "contatados": "Primeiro contato",
+    "contatadas": "Primeiro contato",
+    "em_contato": "Primeiro contato",
     "contato_feito": "Primeiro contato",
+    "contato_realizado": "Primeiro contato",
     "primeiro_contato": "Primeiro contato",
     "1_contato": "Primeiro contato",
+    "primeira_abordagem": "Primeiro contato",
     "abordado": "Primeiro contato",
+    "abordada": "Primeiro contato",
     "abordagem_feita": "Primeiro contato",
     "respondeu": "Respondeu",
     "respondido": "Respondeu",
@@ -99,6 +108,10 @@ STATUS_ALIASES: dict[str, str] = {
     "cliente_fechado": "Fechado",
     "perdido": "Perdido",
 }
+
+
+def normalizar_status_contato(value: Any) -> str:
+    return _status(value) or "Novo"
 
 
 def _texto(value: Any) -> str | None:

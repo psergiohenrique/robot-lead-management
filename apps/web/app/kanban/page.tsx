@@ -39,7 +39,7 @@ export default async function KanbanPage({ searchParams }: KanbanPageProps) {
   const currentCampaign = campaigns.find((campaign) => String(campaign.id) === campaignId);
 
   const leads = await getLeads({
-    limit: 200,
+    limit: 1000,
     offset: 0,
     sem_site: semSite,
     campaign_id: campaignId,

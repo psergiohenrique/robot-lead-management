@@ -105,7 +105,7 @@ def new_campaign(payload: CampaignCreate, current_user: dict = Depends(get_curre
 
 @app.get("/leads", response_model=LeadListResponse)
 def leads(
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=50, ge=1, le=1000),
     offset: int = Query(default=0, ge=0),
     cidade: str | None = None,
     segmento: str | None = None,

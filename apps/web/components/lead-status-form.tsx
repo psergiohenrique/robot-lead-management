@@ -23,6 +23,25 @@ const statusOptions = [
 ];
 
 const statusAliases: Record<string, string> = {
+  Contactado: "Primeiro contato",
+  Contactada: "Primeiro contato",
+  Contactados: "Primeiro contato",
+  Contactadas: "Primeiro contato",
+  Contatado: "Primeiro contato",
+  Contatada: "Primeiro contato",
+  Contatados: "Primeiro contato",
+  Contatadas: "Primeiro contato",
+  Abordado: "Primeiro contato",
+  Abordada: "Primeiro contato",
+  "Contato feito": "Primeiro contato",
+  "Contato realizado": "Primeiro contato",
+  "Em contato": "Primeiro contato",
+  "1º contato": "Primeiro contato",
+  Diagnostico: "Diagnóstico enviado",
+  "Diagnostico enviado": "Diagnóstico enviado",
+  Reuniao: "Reunião marcada",
+  "Reuniao marcada": "Reunião marcada",
+  "Proposta enviada": "Proposta",
   "DiagnÃ³stico enviado": "Diagnóstico enviado",
   "ReuniÃ£o marcada": "Reunião marcada",
 };
