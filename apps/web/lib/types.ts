@@ -8,6 +8,14 @@ export type DashboardSummary = {
   leads_sem_site: number;
   leads_quentes: number;
   provavel_whatsapp: number;
+  status_novo: number;
+  status_primeiro_contato: number;
+  status_respondeu: number;
+  status_diagnostico_enviado: number;
+  status_reuniao_marcada: number;
+  status_proposta: number;
+  status_fechado: number;
+  status_perdido: number;
   contatos_feitos: number;
   respostas_recebidas: number;
   reunioes_marcadas: number;

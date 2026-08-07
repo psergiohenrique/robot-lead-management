@@ -40,6 +40,14 @@ class DashboardSummary(BaseModel):
     leads_sem_site: int = 0
     leads_quentes: int = 0
     provavel_whatsapp: int = 0
+    status_novo: int = 0
+    status_primeiro_contato: int = 0
+    status_respondeu: int = 0
+    status_diagnostico_enviado: int = 0
+    status_reuniao_marcada: int = 0
+    status_proposta: int = 0
+    status_fechado: int = 0
+    status_perdido: int = 0
     contatos_feitos: int = 0
     respostas_recebidas: int = 0
     reunioes_marcadas: int = 0

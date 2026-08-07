@@ -219,6 +219,14 @@ def get_dashboard_summary(user_id: int) -> dict[str, int]:
             "leads_sem_site": 0,
             "leads_quentes": 0,
             "provavel_whatsapp": 0,
+            "status_novo": 0,
+            "status_primeiro_contato": 0,
+            "status_respondeu": 0,
+            "status_diagnostico_enviado": 0,
+            "status_reuniao_marcada": 0,
+            "status_proposta": 0,
+            "status_fechado": 0,
+            "status_perdido": 0,
             "contatos_feitos": 0,
             "respostas_recebidas": 0,
             "reunioes_marcadas": 0,
@@ -235,6 +243,38 @@ def get_dashboard_summary(user_id: int) -> dict[str, int]:
                     COUNT(*) FILTER (WHERE sem_site_cadastrado = 'SIM')::int AS leads_sem_site,
                     COUNT(*) FILTER (WHERE classificacao_lead = 'Quente')::int AS leads_quentes,
                     COUNT(*) FILTER (WHERE whatsapp_status = 'Provável WhatsApp')::int AS provavel_whatsapp,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(status_contato, 'Novo') = 'Novo'
+                    )::int AS status_novo,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(status_contato, '') IN (
+                            'Primeiro contato', 'Contactado', 'Contactada', 'Contactados', 'Contactadas',
+                            'Contatado', 'Contatada', 'Contatados', 'Contatadas',
+                            'Contato feito', 'Contato realizado', 'Em contato', 'Abordado', 'Abordada', '1º contato'
+                        )
+                    )::int AS status_primeiro_contato,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(status_contato, '') = 'Respondeu'
+                    )::int AS status_respondeu,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(status_contato, '') IN (
+                            'Diagnóstico enviado', 'Diagnostico enviado', 'DiagnÃ³stico enviado'
+                        )
+                    )::int AS status_diagnostico_enviado,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(status_contato, '') IN (
+                            'Reunião marcada', 'Reuniao marcada', 'ReuniÃ£o marcada'
+                        )
+                    )::int AS status_reuniao_marcada,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(status_contato, '') IN ('Proposta', 'Proposta enviada')
+                    )::int AS status_proposta,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(status_contato, '') = 'Fechado'
+                    )::int AS status_fechado,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(status_contato, '') = 'Perdido'
+                    )::int AS status_perdido,
                     COUNT(*) FILTER (WHERE COALESCE(status_contato, 'Novo') <> 'Novo')::int AS contatos_feitos,
                     COUNT(*) FILTER (WHERE respondeu = true)::int AS respostas_recebidas,
                     COUNT(*) FILTER (WHERE reuniao_marcada = true)::int AS reunioes_marcadas,

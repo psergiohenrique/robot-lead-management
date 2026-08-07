@@ -96,6 +96,17 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           ? `Primeira abordagem da campanha ${currentCampaign.nome}`
           : "Primeira abordagem";
 
+  const pipelineResumo = [
+    { label: "Novo", value: summary.status_novo, helper: "Ainda sem abordagem" },
+    { label: "Primeiro contato", value: summary.status_primeiro_contato, helper: "Abordagem iniciada" },
+    { label: "Respondeu", value: summary.status_respondeu, helper: "Retornaram contato" },
+    { label: "Diagnóstico enviado", value: summary.status_diagnostico_enviado, helper: "Análise enviada" },
+    { label: "Reunião marcada", value: summary.status_reuniao_marcada, helper: "Próxima conversa" },
+    { label: "Proposta", value: summary.status_proposta, helper: "Em negociação" },
+    { label: "Fechado", value: summary.status_fechado, helper: "Clientes ganhos" },
+    { label: "Perdido", value: summary.status_perdido, helper: "Sem avanço" },
+  ];
+
   return (
     <main className="mx-auto flex min-h-screen max-w-7xl flex-col gap-8 px-5 py-8 sm:px-8">
       <header className="overflow-hidden rounded-[2rem] bg-slate-950 p-8 text-white shadow-soft">
@@ -138,11 +149,15 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         <StatCard label="Provável WhatsApp" value={summary.provavel_whatsapp} helper="Prontos para contato manual" />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-5">
-        {pipeline.map((step, index) => (
-          <div key={step} className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-black/5">
+      <section className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {pipelineResumo.map((step, index) => (
+          <div key={step.label} className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-black/5">
             <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">Etapa {index + 1}</p>
-            <p className="mt-3 font-bold text-slate-950">{step}</p>
+            <div className="mt-3 flex items-end justify-between gap-3">
+              <p className="font-bold text-slate-950">{step.label}</p>
+              <p className="text-3xl font-black text-slate-950">{step.value.toLocaleString("pt-BR")}</p>
+            </div>
+            <p className="mt-2 text-xs font-bold text-slate-400">{step.helper}</p>
           </div>
         ))}
       </section>
