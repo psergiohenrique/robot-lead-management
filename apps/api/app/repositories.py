@@ -66,6 +66,93 @@ def ensure_campaigns_table() -> None:
         connection.commit()
 
 
+def ensure_lead_activities_table() -> None:
+    if not database_configured():
+        return
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                CREATE TABLE IF NOT EXISTS lead_activities (
+                    id BIGSERIAL PRIMARY KEY,
+                    user_id BIGINT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    lead_id BIGINT NOT NULL REFERENCES leads(id) ON DELETE CASCADE,
+                    tipo TEXT NOT NULL,
+                    titulo TEXT NOT NULL,
+                    descricao TEXT,
+                    status_anterior TEXT,
+                    status_novo TEXT,
+                    created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+                )
+                """
+            )
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_lead_activities_lead_id ON lead_activities (lead_id)")
+            cursor.execute("CREATE INDEX IF NOT EXISTS idx_lead_activities_user_id ON lead_activities (user_id)")
+            cursor.execute(
+                "CREATE INDEX IF NOT EXISTS idx_lead_activities_created_at ON lead_activities (created_at DESC)"
+            )
+        connection.commit()
+
+
+def _formatar_atividade(row: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "id": row.get("id"),
+        "tipo": row.get("tipo"),
+        "titulo": row.get("titulo"),
+        "descricao": row.get("descricao"),
+        "status_anterior": row.get("status_anterior"),
+        "status_novo": row.get("status_novo"),
+        "created_at": row.get("created_at"),
+    }
+
+
+def _listar_atividades_lead(cursor: Any, *, lead_id: int, user_id: int, limit: int = 8) -> list[dict[str, Any]]:
+    cursor.execute(
+        """
+        SELECT id, tipo, titulo, descricao, status_anterior, status_novo, created_at
+        FROM lead_activities
+        WHERE lead_id = %(lead_id)s AND user_id = %(user_id)s
+        ORDER BY created_at DESC
+        LIMIT %(limit)s
+        """,
+        {"lead_id": lead_id, "user_id": user_id, "limit": limit},
+    )
+    return [_formatar_atividade(dict(row)) for row in cursor.fetchall()]
+
+
+def _registrar_atividade(
+    cursor: Any,
+    *,
+    user_id: int,
+    lead_id: int,
+    tipo: str,
+    titulo: str,
+    descricao: str | None = None,
+    status_anterior: str | None = None,
+    status_novo: str | None = None,
+) -> None:
+    cursor.execute(
+        """
+        INSERT INTO lead_activities (
+            user_id, lead_id, tipo, titulo, descricao, status_anterior, status_novo
+        ) VALUES (
+            %(user_id)s, %(lead_id)s, %(tipo)s, %(titulo)s, %(descricao)s,
+            %(status_anterior)s, %(status_novo)s
+        )
+        """,
+        {
+            "user_id": user_id,
+            "lead_id": lead_id,
+            "tipo": tipo,
+            "titulo": titulo,
+            "descricao": descricao,
+            "status_anterior": status_anterior,
+            "status_novo": status_novo,
+        },
+    )
+
+
 def _normalizar_lead_saida(lead: dict[str, Any]) -> dict[str, Any]:
     if lead.get("status_contato"):
         lead["status_contato"] = normalizar_status_contato(lead.get("status_contato"))
@@ -309,6 +396,7 @@ def list_leads(
     if campaign_id:
         ensure_campaigns_table()
         ensure_search_batch_leads_table()
+    ensure_lead_activities_table()
 
     filters: list[str] = ["l.user_id = %(user_id)s"]
     params: dict[str, Any] = {"limit": limit, "offset": offset, "user_id": user_id}
@@ -388,7 +476,17 @@ def list_leads(
                     l.quantidade_avaliacoes, l.site_cadastrado, l.sem_site_cadastrado,
                     l.score_oportunidade, l.classificacao_lead, l.prioridade,
                     l.status_contato, l.data_primeiro_contato, l.data_ultimo_contato,
-                    l.proximo_followup, l.updated_at
+                    l.proximo_followup, l.updated_at,
+                    COALESCE((
+                        SELECT json_agg(activity_row)
+                        FROM (
+                            SELECT id, tipo, titulo, descricao, status_anterior, status_novo, created_at
+                            FROM lead_activities la
+                            WHERE la.lead_id = l.id AND la.user_id = %(user_id)s
+                            ORDER BY la.created_at DESC
+                            LIMIT 5
+                        ) activity_row
+                    ), '[]'::json) AS atividades
                 FROM {from_clause}
                 {where}
                 ORDER BY
@@ -412,6 +510,7 @@ def update_lead_contact(lead_id: int, user_id: int, payload: dict[str, Any]) -> 
     if not database_configured():
         return None
 
+    ensure_lead_activities_table()
     allowed_fields = {
         "status_contato",
         "proximo_followup",
@@ -428,12 +527,31 @@ def update_lead_contact(lead_id: int, user_id: int, payload: dict[str, Any]) -> 
     if not values:
         return get_lead(lead_id, user_id)
 
-    assignments = ", ".join(f"{field} = %({field})s" for field in values)
+    if "status_contato" in values:
+        values["status_contato"] = normalizar_status_contato(values["status_contato"])
+
+    assignments_parts = [f"{field} = %({field})s" for field in values]
+    if "status_contato" in values and values["status_contato"] != "Novo":
+        assignments_parts.append("data_primeiro_contato = COALESCE(data_primeiro_contato, CURRENT_DATE)")
+        assignments_parts.append("data_ultimo_contato = CURRENT_DATE")
+    assignments = ", ".join(assignments_parts)
     values["lead_id"] = lead_id
     values["user_id"] = user_id
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT status_contato, observacao_humana
+                FROM leads
+                WHERE id = %(lead_id)s AND user_id = %(user_id)s
+                """,
+                values,
+            )
+            previous = cursor.fetchone()
+            if not previous:
+                return None
+            previous_status = normalizar_status_contato(previous["status_contato"] or "Novo")
             cursor.execute(
                 f"""
                 UPDATE leads
@@ -444,14 +562,40 @@ def update_lead_contact(lead_id: int, user_id: int, payload: dict[str, Any]) -> 
                 values,
             )
             row = cursor.fetchone()
+            if row:
+                updated = _normalizar_lead_saida(dict(row))
+                new_status = updated.get("status_contato") or "Novo"
+                if "status_contato" in values and previous_status != new_status:
+                    _registrar_atividade(
+                        cursor,
+                        user_id=user_id,
+                        lead_id=lead_id,
+                        tipo="status",
+                        titulo=f"Status alterado para {new_status}",
+                        status_anterior=previous_status,
+                        status_novo=new_status,
+                    )
+                if values.get("observacao_humana"):
+                    _registrar_atividade(
+                        cursor,
+                        user_id=user_id,
+                        lead_id=lead_id,
+                        tipo="observacao",
+                        titulo="Observação adicionada",
+                        descricao=str(values["observacao_humana"]),
+                    )
             connection.commit()
-            return _normalizar_lead_saida(dict(row)) if row else None
+            if row:
+                updated["atividades"] = _listar_atividades_lead(cursor, lead_id=lead_id, user_id=user_id)
+                return updated
+            return None
 
 
 def get_lead(lead_id: int, user_id: int) -> dict[str, Any] | None:
     if not database_configured():
         return None
 
+    ensure_lead_activities_table()
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
@@ -459,7 +603,11 @@ def get_lead(lead_id: int, user_id: int) -> dict[str, Any] | None:
                 {"id": lead_id, "user_id": user_id},
             )
             row = cursor.fetchone()
-            return dict(row) if row else None
+            if not row:
+                return None
+            lead = _normalizar_lead_saida(dict(row))
+            lead["atividades"] = _listar_atividades_lead(cursor, lead_id=lead_id, user_id=user_id)
+            return lead
 
 
 def _marcar_erro(batch_id: int, item_id: int, erro: str) -> None:

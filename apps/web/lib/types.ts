@@ -49,7 +49,18 @@ export type Lead = {
   observacao_comercial?: string | null;
   motivo_perda?: string | null;
   observacao_humana?: string | null;
+  atividades?: LeadActivity[];
   updated_at?: string | null;
+};
+
+export type LeadActivity = {
+  id?: number | null;
+  tipo?: string | null;
+  titulo?: string | null;
+  descricao?: string | null;
+  status_anterior?: string | null;
+  status_novo?: string | null;
+  created_at?: string | null;
 };
 
 export type LeadListResponse = {

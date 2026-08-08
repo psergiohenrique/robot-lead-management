@@ -55,6 +55,16 @@ class DashboardSummary(BaseModel):
     fechados: int = 0
 
 
+class LeadActivity(BaseModel):
+    id: int | None = None
+    tipo: str | None = None
+    titulo: str | None = None
+    descricao: str | None = None
+    status_anterior: str | None = None
+    status_novo: str | None = None
+    created_at: datetime | None = None
+
+
 class Lead(BaseModel):
     id: int | None = None
     place_id: str | None = None
@@ -78,6 +88,7 @@ class Lead(BaseModel):
     data_primeiro_contato: date | None = None
     data_ultimo_contato: date | None = None
     proximo_followup: date | None = None
+    atividades: list[LeadActivity] = Field(default_factory=list)
     updated_at: datetime | None = None
 
 

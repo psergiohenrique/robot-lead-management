@@ -1,5 +1,6 @@
 "use client";
 
+import { addLeadObservation } from "@/lib/actions";
 import type { Lead } from "@/lib/types";
 import { criarLinkWhatsApp, criarMensagemWhatsApp, limparTelefoneBrasil } from "@/lib/whatsapp";
 
@@ -31,6 +32,61 @@ function InfoItem({ label, value, roomy = false }: { label: string; value?: stri
       <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">{label}</p>
       <p className="mt-2 whitespace-pre-wrap text-sm font-bold leading-6 text-slate-950">{value || "-"}</p>
     </div>
+  );
+}
+
+function ActivityTimeline({ lead }: { lead: Lead }) {
+  const atividades = lead.atividades ?? [];
+
+  return (
+    <div className="rounded-[2rem] bg-white p-5 shadow-soft ring-1 ring-black/5">
+      <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Histórico recente</p>
+      <div className="mt-5 space-y-3">
+        {atividades.length ? (
+          atividades.map((atividade) => (
+            <div key={atividade.id ?? `${atividade.titulo}-${atividade.created_at}`} className="rounded-3xl bg-slate-50 p-4 ring-1 ring-black/5">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
+                <p className="text-sm font-black text-slate-950">{atividade.titulo ?? "Atividade registrada"}</p>
+                <p className="text-xs font-bold text-slate-400">{formatDate(atividade.created_at)}</p>
+              </div>
+              {atividade.status_anterior || atividade.status_novo ? (
+                <p className="mt-2 text-xs font-bold text-slate-500">
+                  {atividade.status_anterior ?? "-"} → {atividade.status_novo ?? "-"}
+                </p>
+              ) : null}
+              {atividade.descricao ? (
+                <p className="mt-2 whitespace-pre-wrap text-sm leading-6 text-slate-600">{atividade.descricao}</p>
+              ) : null}
+            </div>
+          ))
+        ) : (
+          <div className="rounded-3xl border border-dashed border-slate-200 p-5 text-sm font-bold text-slate-400">
+            Ainda não há atividades registradas para este lead.
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function ObservationForm({ lead, returnTo }: { lead: Lead; returnTo: string }) {
+  if (!lead.id) return null;
+
+  return (
+    <form action={addLeadObservation} className="rounded-[2rem] bg-white p-5 shadow-soft ring-1 ring-black/5">
+      <input type="hidden" name="lead_id" value={lead.id} />
+      <input type="hidden" name="return_to" value={returnTo} />
+      <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Nova observação</p>
+      <textarea
+        className="mt-4 min-h-28 w-full rounded-3xl border border-slate-200 bg-slate-50 p-4 text-sm leading-6 text-slate-800 outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100"
+        name="observacao_humana"
+        placeholder="Ex.: Cliente pediu para retornar amanhã, demonstrou interesse no site promocional..."
+        required
+      />
+      <button className="mt-3 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800">
+        Salvar observação
+      </button>
+    </form>
   );
 }
 
@@ -164,6 +220,11 @@ export function LeadDetailModal({ lead, returnTo, onClose }: LeadDetailModalProp
                 <InfoItem label="Motivo de perda" value={lead.motivo_perda} roomy />
               </div>
             </div>
+          </section>
+
+          <section className="mt-5 grid gap-5 xl:grid-cols-2">
+            <ObservationForm lead={lead} returnTo={returnTo} />
+            <ActivityTimeline lead={lead} />
           </section>
 
           <div className="mt-5">

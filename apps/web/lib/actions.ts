@@ -212,6 +212,46 @@ export async function updateLeadStatus(formData: FormData): Promise<void> {
 
   if (saved) {
     revalidatePath("/");
+    revalidatePath("/kanban");
+  }
+
+  redirect(appendStatusParam(returnTo, saved ? "ok" : "erro"));
+}
+
+export async function addLeadObservation(formData: FormData): Promise<void> {
+  const leadId = String(formData.get("lead_id") ?? "").trim();
+  const observacao = String(formData.get("observacao_humana") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "/").trim() || "/";
+
+  if (!leadId || !observacao) {
+    redirect(appendStatusParam(returnTo, "erro"));
+  }
+
+  let saved = false;
+
+  const token = await getSessionToken();
+  if (!token) {
+    redirect(appendStatusParam(returnTo, "erro"));
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ observacao_humana: observacao }),
+      cache: "no-store",
+    });
+    saved = response.ok;
+  } catch {
+    saved = false;
+  }
+
+  if (saved) {
+    revalidatePath("/");
+    revalidatePath("/kanban");
   }
 
   redirect(appendStatusParam(returnTo, saved ? "ok" : "erro"));
