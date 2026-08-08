@@ -3,6 +3,7 @@
 import { addLeadObservation } from "@/lib/actions";
 import type { Lead } from "@/lib/types";
 import { criarLinkWhatsApp, criarMensagemWhatsApp, limparTelefoneBrasil } from "@/lib/whatsapp";
+import { useFormStatus } from "react-dom";
 
 import { LeadMessageCard } from "./lead-message-card";
 import { LeadStatusForm } from "./lead-status-form";
@@ -41,7 +42,7 @@ function ActivityTimeline({ lead }: { lead: Lead }) {
   return (
     <div className="rounded-[2rem] bg-white p-5 shadow-soft ring-1 ring-black/5">
       <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Histórico recente</p>
-      <div className="mt-5 space-y-3">
+      <div className="mt-5 max-h-[28rem] space-y-3 overflow-y-auto pr-1">
         {atividades.length ? (
           atividades.map((atividade) => (
             <div key={atividade.id ?? `${atividade.titulo}-${atividade.created_at}`} className="rounded-3xl bg-slate-50 p-4 ring-1 ring-black/5">
@@ -69,11 +70,24 @@ function ActivityTimeline({ lead }: { lead: Lead }) {
   );
 }
 
+function ObservationSubmitButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      className="mt-3 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+      disabled={pending}
+    >
+      {pending ? "Salvando..." : "Salvar observaÃ§Ã£o"}
+    </button>
+  );
+}
+
 function ObservationForm({ lead, returnTo }: { lead: Lead; returnTo: string }) {
   if (!lead.id) return null;
 
   return (
-    <form action={addLeadObservation} className="rounded-[2rem] bg-white p-5 shadow-soft ring-1 ring-black/5">
+    <form action={addLeadObservation} className="self-start rounded-[2rem] bg-white p-5 shadow-soft ring-1 ring-black/5">
       <input type="hidden" name="lead_id" value={lead.id} />
       <input type="hidden" name="return_to" value={returnTo} />
       <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Nova observação</p>
@@ -83,9 +97,7 @@ function ObservationForm({ lead, returnTo }: { lead: Lead; returnTo: string }) {
         placeholder="Ex.: Cliente pediu para retornar amanhã, demonstrou interesse no site promocional..."
         required
       />
-      <button className="mt-3 rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800">
-        Salvar observação
-      </button>
+      <ObservationSubmitButton />
     </form>
   );
 }
@@ -222,7 +234,7 @@ export function LeadDetailModal({ lead, returnTo, onClose }: LeadDetailModalProp
             </div>
           </section>
 
-          <section className="mt-5 grid gap-5 xl:grid-cols-2">
+          <section className="mt-5 grid items-start gap-5 xl:grid-cols-2">
             <ObservationForm lead={lead} returnTo={returnTo} />
             <ActivityTimeline lead={lead} />
           </section>

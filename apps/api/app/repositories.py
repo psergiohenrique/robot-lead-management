@@ -121,6 +121,23 @@ def _listar_atividades_lead(cursor: Any, *, lead_id: int, user_id: int, limit: i
     return [_formatar_atividade(dict(row)) for row in cursor.fetchall()]
 
 
+def _observacao_repetida_recente(cursor: Any, *, lead_id: int, user_id: int, descricao: str) -> bool:
+    cursor.execute(
+        """
+        SELECT 1
+        FROM lead_activities
+        WHERE lead_id = %(lead_id)s
+          AND user_id = %(user_id)s
+          AND tipo = 'observacao'
+          AND descricao = %(descricao)s
+          AND created_at >= now() - interval '3 minutes'
+        LIMIT 1
+        """,
+        {"lead_id": lead_id, "user_id": user_id, "descricao": descricao},
+    )
+    return cursor.fetchone() is not None
+
+
 def _registrar_atividade(
     cursor: Any,
     *,
@@ -575,14 +592,17 @@ def update_lead_contact(lead_id: int, user_id: int, payload: dict[str, Any]) -> 
                         status_anterior=previous_status,
                         status_novo=new_status,
                     )
-                if values.get("observacao_humana"):
+                observacao = str(values["observacao_humana"]) if values.get("observacao_humana") else ""
+                if observacao and not _observacao_repetida_recente(
+                    cursor, lead_id=lead_id, user_id=user_id, descricao=observacao
+                ):
                     _registrar_atividade(
                         cursor,
                         user_id=user_id,
                         lead_id=lead_id,
                         tipo="observacao",
                         titulo="Observação adicionada",
-                        descricao=str(values["observacao_humana"]),
+                        descricao=observacao,
                     )
             connection.commit()
             if row:
