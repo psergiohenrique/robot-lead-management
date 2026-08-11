@@ -130,7 +130,13 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               <p className="text-sm text-slate-300">{user.email}</p>
               <LogoutButton />
             </div>
-            <div className="mt-4">
+            <div className="mt-4 flex flex-wrap gap-2">
+              <a
+                className="inline-flex rounded-2xl bg-white/10 px-4 py-2 text-sm font-black text-white ring-1 ring-white/15 transition hover:bg-white/15"
+                href={selectedCampaignId ? `/hoje?campaign_id=${selectedCampaignId}` : "/hoje"}
+              >
+                Rotina de hoje
+              </a>
               <a
                 className="inline-flex rounded-2xl bg-yellow-300 px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-yellow-200"
                 href={selectedCampaignId ? `/kanban?campaign_id=${selectedCampaignId}` : "/kanban"}
