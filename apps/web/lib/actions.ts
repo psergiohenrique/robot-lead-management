@@ -213,6 +213,7 @@ export async function updateLeadStatus(formData: FormData): Promise<void> {
   if (saved) {
     revalidatePath("/");
     revalidatePath("/kanban");
+    revalidatePath("/hoje");
   }
 
   redirect(appendStatusParam(returnTo, saved ? "ok" : "erro"));
@@ -252,6 +253,47 @@ export async function addLeadObservation(formData: FormData): Promise<void> {
   if (saved) {
     revalidatePath("/");
     revalidatePath("/kanban");
+    revalidatePath("/hoje");
+  }
+
+  redirect(appendStatusParam(returnTo, saved ? "ok" : "erro"));
+}
+
+export async function updateLeadFollowup(formData: FormData): Promise<void> {
+  const leadId = String(formData.get("lead_id") ?? "").trim();
+  const proximoFollowup = String(formData.get("proximo_followup") ?? "").trim();
+  const returnTo = String(formData.get("return_to") ?? "/").trim() || "/";
+
+  if (!leadId || !proximoFollowup) {
+    redirect(appendStatusParam(returnTo, "erro"));
+  }
+
+  let saved = false;
+
+  const token = await getSessionToken();
+  if (!token) {
+    redirect(appendStatusParam(returnTo, "erro"));
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/leads/${leadId}`, {
+      method: "PATCH",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ proximo_followup: proximoFollowup }),
+      cache: "no-store",
+    });
+    saved = response.ok;
+  } catch {
+    saved = false;
+  }
+
+  if (saved) {
+    revalidatePath("/");
+    revalidatePath("/kanban");
+    revalidatePath("/hoje");
   }
 
   redirect(appendStatusParam(returnTo, saved ? "ok" : "erro"));

@@ -29,6 +29,7 @@ export default async function HojePage({ searchParams }: HojePageProps) {
   const params = (await searchParams) ?? {};
   const campaigns = await getCampaigns();
   const campaignId = paramValue(params, "campaign_id") ?? campaigns[0]?.id?.toString();
+  const statusSalvo = paramValue(params, "status_salvo");
   const currentCampaign = campaigns.find((campaign) => String(campaign.id) === campaignId);
   const returnTo = currentHref(params);
 
@@ -103,6 +104,17 @@ export default async function HojePage({ searchParams }: HojePageProps) {
           </div>
         </form>
       </section>
+
+      {statusSalvo === "ok" ? (
+        <div className="rounded-3xl bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 ring-1 ring-emerald-200">
+          Alteração salva com sucesso. A fila de hoje já foi atualizada.
+        </div>
+      ) : null}
+      {statusSalvo === "erro" ? (
+        <div className="rounded-3xl bg-red-50 px-5 py-4 text-sm font-bold text-red-800 ring-1 ring-red-200">
+          Não consegui salvar a alteração. Confira se a API está online e tente novamente.
+        </div>
+      ) : null}
 
       <section className="grid gap-4 md:grid-cols-3">
         <div className="rounded-3xl bg-white p-5 shadow-soft ring-1 ring-black/5">

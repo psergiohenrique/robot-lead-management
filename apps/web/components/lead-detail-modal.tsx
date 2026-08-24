@@ -1,6 +1,6 @@
 "use client";
 
-import { addLeadObservation } from "@/lib/actions";
+import { addLeadObservation, updateLeadFollowup } from "@/lib/actions";
 import type { Lead } from "@/lib/types";
 import { criarLinkWhatsApp, criarMensagemWhatsApp, limparTelefoneBrasil } from "@/lib/whatsapp";
 import { useFormStatus } from "react-dom";
@@ -34,6 +34,26 @@ function InfoItem({ label, value, roomy = false }: { label: string; value?: stri
       <p className="mt-2 whitespace-pre-wrap text-sm font-bold leading-6 text-slate-950">{value || "-"}</p>
     </div>
   );
+}
+
+function addDays(days: number): string {
+  const date = new Date();
+  date.setDate(date.getDate() + days);
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatShortDate(value?: string | null): string {
+  if (!value) return "-";
+  const date = new Date(`${value}T00:00:00`);
+  if (Number.isNaN(date.getTime())) return value;
+  return date.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
 }
 
 function ActivityTimeline({ lead }: { lead: Lead }) {
@@ -80,6 +100,80 @@ function ObservationSubmitButton() {
     >
       {pending ? "Salvando..." : "Salvar observaÃ§Ã£o"}
     </button>
+  );
+}
+
+function FollowupSubmitButton() {
+  const { pending } = useFormStatus();
+
+  return (
+    <button
+      className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
+      disabled={pending}
+    >
+      {pending ? "Salvando..." : "Salvar data"}
+    </button>
+  );
+}
+
+function QuickFollowupButton({
+  lead,
+  returnTo,
+  label,
+  date,
+}: {
+  lead: Lead;
+  returnTo: string;
+  label: string;
+  date: string;
+}) {
+  if (!lead.id) return null;
+
+  return (
+    <form action={updateLeadFollowup}>
+      <input type="hidden" name="lead_id" value={lead.id} />
+      <input type="hidden" name="return_to" value={returnTo} />
+      <input type="hidden" name="proximo_followup" value={date} />
+      <button className="rounded-2xl bg-white px-3 py-2 text-xs font-black text-slate-800 ring-1 ring-black/10 transition hover:bg-yellow-50">
+        {label}
+      </button>
+    </form>
+  );
+}
+
+function FollowupForm({ lead, returnTo }: { lead: Lead; returnTo: string }) {
+  if (!lead.id) return null;
+
+  const tomorrow = addDays(1);
+  const threeDays = addDays(3);
+  const sevenDays = addDays(7);
+
+  return (
+    <div className="mt-5 rounded-3xl bg-slate-50 p-5 ring-1 ring-black/5">
+      <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">Agendar próximo follow-up</p>
+      <p className="mt-2 text-sm text-slate-600">
+        Data atual: <span className="font-black text-slate-950">{formatShortDate(lead.proximo_followup)}</span>
+      </p>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        <QuickFollowupButton lead={lead} returnTo={returnTo} label="Amanhã" date={tomorrow} />
+        <QuickFollowupButton lead={lead} returnTo={returnTo} label="Em 3 dias" date={threeDays} />
+        <QuickFollowupButton lead={lead} returnTo={returnTo} label="Em 7 dias" date={sevenDays} />
+      </div>
+
+      <form action={updateLeadFollowup} className="mt-4 flex flex-col gap-3 sm:flex-row">
+        <input type="hidden" name="lead_id" value={lead.id} />
+        <input type="hidden" name="return_to" value={returnTo} />
+        <input
+          className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white px-3 py-3 text-sm font-bold text-slate-700 outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100"
+          name="proximo_followup"
+          type="date"
+          defaultValue={lead.proximo_followup ?? ""}
+          required
+        />
+        <FollowupSubmitButton />
+      </form>
+    </div>
   );
 }
 
@@ -196,6 +290,8 @@ export function LeadDetailModal({ lead, returnTo, onClose }: LeadDetailModalProp
                   </div>
                 ) : null}
               </div>
+
+              <FollowupForm lead={lead} returnTo={returnTo} />
             </div>
 
             <div className="rounded-[2rem] bg-white p-5 shadow-soft ring-1 ring-black/5">

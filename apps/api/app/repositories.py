@@ -170,6 +170,15 @@ def _registrar_atividade(
     )
 
 
+def _formatar_data_br(value: Any) -> str:
+    if not value:
+        return "-"
+    try:
+        return value.strftime("%d/%m/%Y")
+    except AttributeError:
+        return str(value)
+
+
 def _normalizar_lead_saida(lead: dict[str, Any]) -> dict[str, Any]:
     if lead.get("status_contato"):
         lead["status_contato"] = normalizar_status_contato(lead.get("status_contato"))
@@ -559,7 +568,7 @@ def update_lead_contact(lead_id: int, user_id: int, payload: dict[str, Any]) -> 
         with connection.cursor() as cursor:
             cursor.execute(
                 """
-                SELECT status_contato, observacao_humana
+                SELECT status_contato, observacao_humana, proximo_followup
                 FROM leads
                 WHERE id = %(lead_id)s AND user_id = %(user_id)s
                 """,
@@ -569,6 +578,7 @@ def update_lead_contact(lead_id: int, user_id: int, payload: dict[str, Any]) -> 
             if not previous:
                 return None
             previous_status = normalizar_status_contato(previous["status_contato"] or "Novo")
+            previous_followup = previous["proximo_followup"]
             cursor.execute(
                 f"""
                 UPDATE leads
@@ -591,6 +601,15 @@ def update_lead_contact(lead_id: int, user_id: int, payload: dict[str, Any]) -> 
                         titulo=f"Status alterado para {new_status}",
                         status_anterior=previous_status,
                         status_novo=new_status,
+                    )
+                if "proximo_followup" in values and str(previous_followup or "") != str(updated.get("proximo_followup") or ""):
+                    _registrar_atividade(
+                        cursor,
+                        user_id=user_id,
+                        lead_id=lead_id,
+                        tipo="followup",
+                        titulo=f"Follow-up agendado para {_formatar_data_br(updated.get('proximo_followup'))}",
+                        descricao="Próxima ação comercial definida para este lead.",
                     )
                 observacao = str(values["observacao_humana"]) if values.get("observacao_humana") else ""
                 if observacao and not _observacao_repetida_recente(
