@@ -139,6 +139,12 @@ export default async function HomePage({ searchParams }: HomePageProps) {
                 Rotina de hoje
               </a>
               <a
+                className="inline-flex rounded-2xl bg-white/10 px-4 py-2 text-sm font-black text-white ring-1 ring-white/15 transition hover:bg-white/15"
+                href="/metricas"
+              >
+                Métricas
+              </a>
+              <a
                 className="inline-flex rounded-2xl bg-yellow-300 px-4 py-2 text-sm font-black text-slate-950 transition hover:bg-yellow-200"
                 href={selectedCampaignId ? `/kanban?campaign_id=${selectedCampaignId}` : "/kanban"}
               >

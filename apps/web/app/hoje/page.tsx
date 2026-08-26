@@ -71,6 +71,12 @@ export default async function HojePage({ searchParams }: HojePageProps) {
               >
                 Kanban
               </a>
+              <a
+                className="rounded-2xl bg-white/10 px-4 py-2 text-sm font-black text-white ring-1 ring-white/15 transition hover:bg-white/15"
+                href="/metricas"
+              >
+                Métricas
+              </a>
             </div>
           </div>
         </div>

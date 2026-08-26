@@ -10,6 +10,7 @@ from app.importer import extrair_leads_xlsx
 from app.repositories import (
     create_campaign,
     criar_e_executar_lote,
+    get_activity_summary,
     get_dashboard_summary,
     get_lead,
     importar_leads_planilha,
@@ -20,6 +21,7 @@ from app.repositories import (
 )
 from app.schemas import (
     AuthSession,
+    ActivitySummary,
     CampaignCreate,
     CampaignSummary,
     DashboardSummary,
@@ -87,6 +89,11 @@ def auth_me(current_user: dict = Depends(get_current_user)) -> User:
 @app.get("/dashboard/summary", response_model=DashboardSummary)
 def dashboard_summary(current_user: dict = Depends(get_current_user)) -> DashboardSummary:
     return DashboardSummary(**get_dashboard_summary(current_user["id"]))
+
+
+@app.get("/dashboard/activity-summary", response_model=ActivitySummary)
+def dashboard_activity_summary(current_user: dict = Depends(get_current_user)) -> ActivitySummary:
+    return ActivitySummary(**get_activity_summary(current_user["id"]))
 
 
 @app.get("/campaigns", response_model=list[CampaignSummary])

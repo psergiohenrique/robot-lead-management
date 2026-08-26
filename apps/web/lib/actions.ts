@@ -214,6 +214,7 @@ export async function updateLeadStatus(formData: FormData): Promise<void> {
     revalidatePath("/");
     revalidatePath("/kanban");
     revalidatePath("/hoje");
+    revalidatePath("/metricas");
   }
 
   redirect(appendStatusParam(returnTo, saved ? "ok" : "erro"));
@@ -254,6 +255,7 @@ export async function addLeadObservation(formData: FormData): Promise<void> {
     revalidatePath("/");
     revalidatePath("/kanban");
     revalidatePath("/hoje");
+    revalidatePath("/metricas");
   }
 
   redirect(appendStatusParam(returnTo, saved ? "ok" : "erro"));
@@ -294,6 +296,7 @@ export async function updateLeadFollowup(formData: FormData): Promise<void> {
     revalidatePath("/");
     revalidatePath("/kanban");
     revalidatePath("/hoje");
+    revalidatePath("/metricas");
   }
 
   redirect(appendStatusParam(returnTo, saved ? "ok" : "erro"));

@@ -56,6 +56,23 @@ class DashboardSummary(BaseModel):
     fechados: int = 0
 
 
+class ActivitySummary(BaseModel):
+    total_acoes: int = 0
+    acoes_hoje: int = 0
+    acoes_7_dias: int = 0
+    contatos_feitos: int = 0
+    mudancas_status: int = 0
+    observacoes_registradas: int = 0
+    followups_agendados: int = 0
+    leads_com_followup_hoje: int = 0
+    leads_com_followup_atrasado: int = 0
+    respostas_recebidas: int = 0
+    reunioes_marcadas: int = 0
+    propostas_enviadas: int = 0
+    fechados: int = 0
+    contatos_invalidos: int = 0
+
+
 class LeadActivity(BaseModel):
     id: int | None = None
     tipo: str | None = None

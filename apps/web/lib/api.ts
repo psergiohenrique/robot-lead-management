@@ -1,5 +1,5 @@
 import { getSessionToken } from "./auth";
-import type { CampaignSummary, DashboardSummary, Lead, LeadListResponse, SearchBatchSummary } from "./types";
+import type { ActivitySummary, CampaignSummary, DashboardSummary, Lead, LeadListResponse, SearchBatchSummary } from "./types";
 
 const API_BASE_URL = process.env.API_BASE_URL ?? "http://localhost:8000";
 
@@ -32,6 +32,23 @@ const emptyLeads: LeadListResponse = {
   database_configured: false,
 };
 
+const emptyActivitySummary: ActivitySummary = {
+  total_acoes: 0,
+  acoes_hoje: 0,
+  acoes_7_dias: 0,
+  contatos_feitos: 0,
+  mudancas_status: 0,
+  observacoes_registradas: 0,
+  followups_agendados: 0,
+  leads_com_followup_hoje: 0,
+  leads_com_followup_atrasado: 0,
+  respostas_recebidas: 0,
+  reunioes_marcadas: 0,
+  propostas_enviadas: 0,
+  fechados: 0,
+  contatos_invalidos: 0,
+};
+
 async function apiGet<T>(path: string, fallback: T): Promise<T> {
   const token = await getSessionToken();
   if (!token) {
@@ -59,6 +76,10 @@ async function apiGet<T>(path: string, fallback: T): Promise<T> {
 
 export async function getDashboardSummary(): Promise<DashboardSummary> {
   return apiGet<DashboardSummary>("/dashboard/summary", emptySummary);
+}
+
+export async function getActivitySummary(): Promise<ActivitySummary> {
+  return apiGet<ActivitySummary>("/dashboard/activity-summary", emptyActivitySummary);
 }
 
 type LeadQuery = {

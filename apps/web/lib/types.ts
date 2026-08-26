@@ -24,6 +24,23 @@ export type DashboardSummary = {
   fechados: number;
 };
 
+export type ActivitySummary = {
+  total_acoes: number;
+  acoes_hoje: number;
+  acoes_7_dias: number;
+  contatos_feitos: number;
+  mudancas_status: number;
+  observacoes_registradas: number;
+  followups_agendados: number;
+  leads_com_followup_hoje: number;
+  leads_com_followup_atrasado: number;
+  respostas_recebidas: number;
+  reunioes_marcadas: number;
+  propostas_enviadas: number;
+  fechados: number;
+  contatos_invalidos: number;
+};
+
 export type Lead = {
   id?: number | null;
   nome: string;

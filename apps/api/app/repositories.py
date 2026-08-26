@@ -410,6 +410,83 @@ def get_dashboard_summary(user_id: int) -> dict[str, int]:
             return dict(row)
 
 
+def get_activity_summary(user_id: int) -> dict[str, int]:
+    empty = {
+        "total_acoes": 0,
+        "acoes_hoje": 0,
+        "acoes_7_dias": 0,
+        "contatos_feitos": 0,
+        "mudancas_status": 0,
+        "observacoes_registradas": 0,
+        "followups_agendados": 0,
+        "leads_com_followup_hoje": 0,
+        "leads_com_followup_atrasado": 0,
+        "respostas_recebidas": 0,
+        "reunioes_marcadas": 0,
+        "propostas_enviadas": 0,
+        "fechados": 0,
+        "contatos_invalidos": 0,
+    }
+
+    if not database_configured():
+        return empty
+
+    ensure_lead_activities_table()
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*)::int AS total_acoes,
+                    COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE)::int AS acoes_hoje,
+                    COUNT(*) FILTER (WHERE created_at >= now() - interval '7 days')::int AS acoes_7_dias,
+                    COUNT(*) FILTER (WHERE tipo = 'status')::int AS mudancas_status,
+                    COUNT(*) FILTER (WHERE tipo = 'observacao')::int AS observacoes_registradas,
+                    COUNT(*) FILTER (WHERE tipo = 'followup')::int AS followups_agendados
+                FROM lead_activities
+                WHERE user_id = %(user_id)s
+                """,
+                {"user_id": user_id},
+            )
+            activity_row = cursor.fetchone() or {}
+
+            cursor.execute(
+                """
+                SELECT
+                    COUNT(*) FILTER (WHERE COALESCE(status_contato, 'Novo') <> 'Novo')::int AS contatos_feitos,
+                    COUNT(*) FILTER (
+                        WHERE proximo_followup = CURRENT_DATE
+                    )::int AS leads_com_followup_hoje,
+                    COUNT(*) FILTER (
+                        WHERE proximo_followup < CURRENT_DATE
+                          AND COALESCE(status_contato, '') NOT IN ('Fechado', 'Perdido', 'Contato inválido')
+                    )::int AS leads_com_followup_atrasado,
+                    COUNT(*) FILTER (WHERE COALESCE(status_contato, '') = 'Respondeu')::int AS respostas_recebidas,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(status_contato, '') IN ('Reunião marcada', 'Reuniao marcada', 'ReuniÃ£o marcada')
+                    )::int AS reunioes_marcadas,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(status_contato, '') IN ('Proposta', 'Proposta enviada')
+                    )::int AS propostas_enviadas,
+                    COUNT(*) FILTER (WHERE COALESCE(status_contato, '') = 'Fechado')::int AS fechados,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(status_contato, '') IN (
+                            'Contato inválido', 'Contato invalido', 'Número errado', 'Numero errado',
+                            'Telefone errado', 'Não é WhatsApp', 'Nao e WhatsApp', 'Sem WhatsApp',
+                            'Não é do local', 'Nao e do local'
+                        )
+                    )::int AS contatos_invalidos
+                FROM leads
+                WHERE user_id = %(user_id)s
+                """,
+                {"user_id": user_id},
+            )
+            lead_row = cursor.fetchone() or {}
+
+    return {**empty, **dict(activity_row), **dict(lead_row)}
+
+
 def list_leads(
     *,
     user_id: int,
