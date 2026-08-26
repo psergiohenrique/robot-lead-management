@@ -20,7 +20,7 @@ type WorkSection = {
   leads: Lead[];
 };
 
-const finishedStatuses = new Set(["Fechado", "Perdido"]);
+const finishedStatuses = new Set(["Fechado", "Perdido", "Contato inválido"]);
 
 function normalizeText(value?: string | null): string {
   return (value ?? "")
@@ -33,6 +33,16 @@ function normalizeText(value?: string | null): string {
 function normalizeStatus(status?: string | null): string {
   const value = normalizeText(status);
   if (!value || value === "novo") return "Novo";
+  if (
+    value.includes("invalido") ||
+    value.includes("numero errado") ||
+    value.includes("telefone errado") ||
+    value.includes("nao e whatsapp") ||
+    value.includes("sem whatsapp") ||
+    value.includes("nao e do local")
+  ) {
+    return "Contato inválido";
+  }
   if (value.includes("primeiro") || value.includes("contato") || value.includes("contact")) return "Primeiro contato";
   if (value.includes("respondeu")) return "Respondeu";
   if (value.includes("diagnostico")) return "Diagnóstico enviado";

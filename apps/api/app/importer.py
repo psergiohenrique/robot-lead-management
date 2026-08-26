@@ -107,6 +107,18 @@ STATUS_ALIASES: dict[str, str] = {
     "fechado": "Fechado",
     "cliente_fechado": "Fechado",
     "perdido": "Perdido",
+    "contato_invalido": "Contato inválido",
+    "contato_inválido": "Contato inválido",
+    "numero_errado": "Contato inválido",
+    "número_errado": "Contato inválido",
+    "telefone_errado": "Contato inválido",
+    "nao_e_whatsapp": "Contato inválido",
+    "não_e_whatsapp": "Contato inválido",
+    "sem_whatsapp": "Contato inválido",
+    "nao_e_do_local": "Contato inválido",
+    "não_e_do_local": "Contato inválido",
+    "telefone_invalido": "Contato inválido",
+    "telefone_inválido": "Contato inválido",
 }
 
 

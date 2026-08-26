@@ -48,6 +48,7 @@ class DashboardSummary(BaseModel):
     status_proposta: int = 0
     status_fechado: int = 0
     status_perdido: int = 0
+    status_contato_invalido: int = 0
     contatos_feitos: int = 0
     respostas_recebidas: int = 0
     reunioes_marcadas: int = 0

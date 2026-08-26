@@ -16,6 +16,7 @@ const emptySummary: DashboardSummary = {
   status_proposta: 0,
   status_fechado: 0,
   status_perdido: 0,
+  status_contato_invalido: 0,
   contatos_feitos: 0,
   respostas_recebidas: 0,
   reunioes_marcadas: 0,

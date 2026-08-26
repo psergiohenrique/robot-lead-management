@@ -16,6 +16,7 @@ export type DashboardSummary = {
   status_proposta: number;
   status_fechado: number;
   status_perdido: number;
+  status_contato_invalido: number;
   contatos_feitos: number;
   respostas_recebidas: number;
   reunioes_marcadas: number;

@@ -105,6 +105,7 @@ export default async function HomePage({ searchParams }: HomePageProps) {
     { label: "Proposta", value: summary.status_proposta, helper: "Em negociação" },
     { label: "Fechado", value: summary.status_fechado, helper: "Clientes ganhos" },
     { label: "Perdido", value: summary.status_perdido, helper: "Sem avanço" },
+    { label: "Contato inválido", value: summary.status_contato_invalido, helper: "Número errado ou sem WhatsApp" },
   ];
 
   return (

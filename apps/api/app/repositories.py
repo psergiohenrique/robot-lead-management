@@ -340,6 +340,7 @@ def get_dashboard_summary(user_id: int) -> dict[str, int]:
             "status_proposta": 0,
             "status_fechado": 0,
             "status_perdido": 0,
+            "status_contato_invalido": 0,
             "contatos_feitos": 0,
             "respostas_recebidas": 0,
             "reunioes_marcadas": 0,
@@ -388,6 +389,13 @@ def get_dashboard_summary(user_id: int) -> dict[str, int]:
                     COUNT(*) FILTER (
                         WHERE COALESCE(status_contato, '') = 'Perdido'
                     )::int AS status_perdido,
+                    COUNT(*) FILTER (
+                        WHERE COALESCE(status_contato, '') IN (
+                            'Contato inválido', 'Contato invalido', 'Número errado', 'Numero errado',
+                            'Telefone errado', 'Não é WhatsApp', 'Nao e WhatsApp', 'Sem WhatsApp',
+                            'Não é do local', 'Nao e do local'
+                        )
+                    )::int AS status_contato_invalido,
                     COUNT(*) FILTER (WHERE COALESCE(status_contato, 'Novo') <> 'Novo')::int AS contatos_feitos,
                     COUNT(*) FILTER (WHERE respondeu = true)::int AS respostas_recebidas,
                     COUNT(*) FILTER (WHERE reuniao_marcada = true)::int AS reunioes_marcadas,

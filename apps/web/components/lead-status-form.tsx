@@ -20,6 +20,7 @@ const statusOptions = [
   "Proposta",
   "Fechado",
   "Perdido",
+  "Contato inválido",
 ];
 
 const statusAliases: Record<string, string> = {
@@ -42,6 +43,16 @@ const statusAliases: Record<string, string> = {
   Reuniao: "Reunião marcada",
   "Reuniao marcada": "Reunião marcada",
   "Proposta enviada": "Proposta",
+  "Contato invalido": "Contato inválido",
+  "Contato inválido": "Contato inválido",
+  "Número errado": "Contato inválido",
+  "Numero errado": "Contato inválido",
+  "Telefone errado": "Contato inválido",
+  "Não é WhatsApp": "Contato inválido",
+  "Nao e WhatsApp": "Contato inválido",
+  "Sem WhatsApp": "Contato inválido",
+  "Não é do local": "Contato inválido",
+  "Nao e do local": "Contato inválido",
   "DiagnÃ³stico enviado": "Diagnóstico enviado",
   "ReuniÃ£o marcada": "Reunião marcada",
 };
