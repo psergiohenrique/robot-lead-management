@@ -25,20 +25,37 @@ export type DashboardSummary = {
 };
 
 export type ActivitySummary = {
+  periodo: string;
   total_acoes: number;
+  acoes_periodo: number;
   acoes_hoje: number;
   acoes_7_dias: number;
+  acoes_30_dias: number;
   contatos_feitos: number;
+  primeiros_contatos_periodo: number;
+  leads_contatados_unicos_periodo: number;
   mudancas_status: number;
   observacoes_registradas: number;
   followups_agendados: number;
+  followups_periodo: number;
   leads_com_followup_hoje: number;
   leads_com_followup_atrasado: number;
   respostas_recebidas: number;
+  respostas_periodo: number;
+  taxa_resposta_primeiro_contato: number;
+  contatos_sem_resposta: number;
+  tempo_medio_primeira_resposta_dias: number;
+  qualificados_periodo: number;
   reunioes_marcadas: number;
+  reunioes_periodo: number;
   propostas_enviadas: number;
+  propostas_periodo: number;
   fechados: number;
+  fechados_periodo: number;
   contatos_invalidos: number;
+  conversao_contato_reuniao: number;
+  conversao_resposta_reuniao: number;
+  eficiencia_acoes_resposta: number;
 };
 
 export type Lead = {

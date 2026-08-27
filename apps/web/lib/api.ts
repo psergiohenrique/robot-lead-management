@@ -33,20 +33,37 @@ const emptyLeads: LeadListResponse = {
 };
 
 const emptyActivitySummary: ActivitySummary = {
+  periodo: "7d",
   total_acoes: 0,
+  acoes_periodo: 0,
   acoes_hoje: 0,
   acoes_7_dias: 0,
+  acoes_30_dias: 0,
   contatos_feitos: 0,
+  primeiros_contatos_periodo: 0,
+  leads_contatados_unicos_periodo: 0,
   mudancas_status: 0,
   observacoes_registradas: 0,
   followups_agendados: 0,
+  followups_periodo: 0,
   leads_com_followup_hoje: 0,
   leads_com_followup_atrasado: 0,
   respostas_recebidas: 0,
+  respostas_periodo: 0,
+  taxa_resposta_primeiro_contato: 0,
+  contatos_sem_resposta: 0,
+  tempo_medio_primeira_resposta_dias: 0,
+  qualificados_periodo: 0,
   reunioes_marcadas: 0,
+  reunioes_periodo: 0,
   propostas_enviadas: 0,
+  propostas_periodo: 0,
   fechados: 0,
+  fechados_periodo: 0,
   contatos_invalidos: 0,
+  conversao_contato_reuniao: 0,
+  conversao_resposta_reuniao: 0,
+  eficiencia_acoes_resposta: 0,
 };
 
 async function apiGet<T>(path: string, fallback: T): Promise<T> {
@@ -78,8 +95,13 @@ export async function getDashboardSummary(): Promise<DashboardSummary> {
   return apiGet<DashboardSummary>("/dashboard/summary", emptySummary);
 }
 
-export async function getActivitySummary(): Promise<ActivitySummary> {
-  return apiGet<ActivitySummary>("/dashboard/activity-summary", emptyActivitySummary);
+export async function getActivitySummary(periodo = "7d"): Promise<ActivitySummary> {
+  const params = new URLSearchParams();
+  params.set("periodo", periodo);
+  return apiGet<ActivitySummary>(`/dashboard/activity-summary?${params.toString()}`, {
+    ...emptyActivitySummary,
+    periodo,
+  });
 }
 
 type LeadQuery = {

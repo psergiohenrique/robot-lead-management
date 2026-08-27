@@ -410,22 +410,57 @@ def get_dashboard_summary(user_id: int) -> dict[str, int]:
             return dict(row)
 
 
-def get_activity_summary(user_id: int) -> dict[str, int]:
+def _periodo_sql(periodo: str) -> str:
+    if periodo == "hoje":
+        return "created_at::date = CURRENT_DATE"
+    if periodo == "30d":
+        return "created_at >= now() - interval '30 days'"
+    if periodo == "tudo":
+        return "TRUE"
+    return "created_at >= now() - interval '7 days'"
+
+
+def _safe_percent(numerador: int | float | None, denominador: int | float | None) -> float:
+    if not denominador:
+        return 0
+    return round((float(numerador or 0) / float(denominador)) * 100, 1)
+
+
+def get_activity_summary(user_id: int, periodo: str = "7d") -> dict[str, Any]:
+    periodo = periodo if periodo in {"hoje", "7d", "30d", "tudo"} else "7d"
+    periodo_condition = _periodo_sql(periodo)
     empty = {
+        "periodo": periodo,
         "total_acoes": 0,
+        "acoes_periodo": 0,
         "acoes_hoje": 0,
         "acoes_7_dias": 0,
+        "acoes_30_dias": 0,
         "contatos_feitos": 0,
+        "primeiros_contatos_periodo": 0,
+        "leads_contatados_unicos_periodo": 0,
         "mudancas_status": 0,
         "observacoes_registradas": 0,
         "followups_agendados": 0,
+        "followups_periodo": 0,
         "leads_com_followup_hoje": 0,
         "leads_com_followup_atrasado": 0,
         "respostas_recebidas": 0,
+        "respostas_periodo": 0,
+        "taxa_resposta_primeiro_contato": 0,
+        "contatos_sem_resposta": 0,
+        "tempo_medio_primeira_resposta_dias": 0,
+        "qualificados_periodo": 0,
         "reunioes_marcadas": 0,
+        "reunioes_periodo": 0,
         "propostas_enviadas": 0,
+        "propostas_periodo": 0,
         "fechados": 0,
+        "fechados_periodo": 0,
         "contatos_invalidos": 0,
+        "conversao_contato_reuniao": 0,
+        "conversao_resposta_reuniao": 0,
+        "eficiencia_acoes_resposta": 0,
     }
 
     if not database_configured():
@@ -436,14 +471,51 @@ def get_activity_summary(user_id: int) -> dict[str, int]:
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                """
+                f"""
                 SELECT
                     COUNT(*)::int AS total_acoes,
+                    COUNT(*) FILTER (WHERE {periodo_condition})::int AS acoes_periodo,
                     COUNT(*) FILTER (WHERE created_at::date = CURRENT_DATE)::int AS acoes_hoje,
                     COUNT(*) FILTER (WHERE created_at >= now() - interval '7 days')::int AS acoes_7_dias,
+                    COUNT(*) FILTER (WHERE created_at >= now() - interval '30 days')::int AS acoes_30_dias,
                     COUNT(*) FILTER (WHERE tipo = 'status')::int AS mudancas_status,
                     COUNT(*) FILTER (WHERE tipo = 'observacao')::int AS observacoes_registradas,
-                    COUNT(*) FILTER (WHERE tipo = 'followup')::int AS followups_agendados
+                    COUNT(*) FILTER (WHERE tipo = 'followup')::int AS followups_agendados,
+                    COUNT(*) FILTER (
+                        WHERE tipo = 'status'
+                          AND status_novo = 'Primeiro contato'
+                          AND {periodo_condition}
+                    )::int AS primeiros_contatos_periodo,
+                    COUNT(DISTINCT lead_id) FILTER (WHERE {periodo_condition})::int AS leads_contatados_unicos_periodo,
+                    COUNT(*) FILTER (
+                        WHERE tipo = 'followup'
+                          AND {periodo_condition}
+                    )::int AS followups_periodo,
+                    COUNT(*) FILTER (
+                        WHERE tipo = 'status'
+                          AND status_novo = 'Respondeu'
+                          AND {periodo_condition}
+                    )::int AS respostas_periodo,
+                    COUNT(*) FILTER (
+                        WHERE tipo = 'status'
+                          AND status_novo IN ('Respondeu', 'Diagnóstico enviado', 'Reunião marcada', 'Proposta', 'Fechado')
+                          AND {periodo_condition}
+                    )::int AS qualificados_periodo,
+                    COUNT(*) FILTER (
+                        WHERE tipo = 'status'
+                          AND status_novo = 'Reunião marcada'
+                          AND {periodo_condition}
+                    )::int AS reunioes_periodo,
+                    COUNT(*) FILTER (
+                        WHERE tipo = 'status'
+                          AND status_novo IN ('Proposta', 'Proposta enviada')
+                          AND {periodo_condition}
+                    )::int AS propostas_periodo,
+                    COUNT(*) FILTER (
+                        WHERE tipo = 'status'
+                          AND status_novo = 'Fechado'
+                          AND {periodo_condition}
+                    )::int AS fechados_periodo
                 FROM lead_activities
                 WHERE user_id = %(user_id)s
                 """,
@@ -463,6 +535,7 @@ def get_activity_summary(user_id: int) -> dict[str, int]:
                           AND COALESCE(status_contato, '') NOT IN ('Fechado', 'Perdido', 'Contato inválido')
                     )::int AS leads_com_followup_atrasado,
                     COUNT(*) FILTER (WHERE COALESCE(status_contato, '') = 'Respondeu')::int AS respostas_recebidas,
+                    COUNT(*) FILTER (WHERE COALESCE(status_contato, '') = 'Primeiro contato')::int AS contatos_sem_resposta,
                     COUNT(*) FILTER (
                         WHERE COALESCE(status_contato, '') IN ('Reunião marcada', 'Reuniao marcada', 'ReuniÃ£o marcada')
                     )::int AS reunioes_marcadas,
@@ -484,7 +557,47 @@ def get_activity_summary(user_id: int) -> dict[str, int]:
             )
             lead_row = cursor.fetchone() or {}
 
-    return {**empty, **dict(activity_row), **dict(lead_row)}
+            cursor.execute(
+                """
+                WITH primeiros AS (
+                    SELECT lead_id, MIN(created_at) AS primeiro_contato_em
+                    FROM lead_activities
+                    WHERE user_id = %(user_id)s
+                      AND tipo = 'status'
+                      AND status_novo = 'Primeiro contato'
+                    GROUP BY lead_id
+                ),
+                respostas AS (
+                    SELECT lead_id, MIN(created_at) AS respondeu_em
+                    FROM lead_activities
+                    WHERE user_id = %(user_id)s
+                      AND tipo = 'status'
+                      AND status_novo = 'Respondeu'
+                    GROUP BY lead_id
+                )
+                SELECT
+                    COALESCE(
+                        ROUND(AVG(EXTRACT(EPOCH FROM (respostas.respondeu_em - primeiros.primeiro_contato_em)) / 86400)::numeric, 1),
+                        0
+                    )::float AS tempo_medio_primeira_resposta_dias
+                FROM primeiros
+                JOIN respostas ON respostas.lead_id = primeiros.lead_id
+                WHERE respostas.respondeu_em >= primeiros.primeiro_contato_em
+                """,
+                {"user_id": user_id},
+            )
+            tempo_row = cursor.fetchone() or {}
+
+    result = {**empty, **dict(activity_row), **dict(lead_row), **dict(tempo_row)}
+    result["taxa_resposta_primeiro_contato"] = _safe_percent(
+        result["respostas_periodo"], result["primeiros_contatos_periodo"]
+    )
+    result["conversao_contato_reuniao"] = _safe_percent(
+        result["reunioes_periodo"], result["leads_contatados_unicos_periodo"]
+    )
+    result["conversao_resposta_reuniao"] = _safe_percent(result["reunioes_periodo"], result["respostas_periodo"])
+    result["eficiencia_acoes_resposta"] = _safe_percent(result["respostas_periodo"], result["acoes_periodo"])
+    return result
 
 
 def list_leads(

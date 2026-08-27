@@ -92,8 +92,11 @@ def dashboard_summary(current_user: dict = Depends(get_current_user)) -> Dashboa
 
 
 @app.get("/dashboard/activity-summary", response_model=ActivitySummary)
-def dashboard_activity_summary(current_user: dict = Depends(get_current_user)) -> ActivitySummary:
-    return ActivitySummary(**get_activity_summary(current_user["id"]))
+def dashboard_activity_summary(
+    periodo: str = Query(default="7d", pattern="^(hoje|7d|30d|tudo)$"),
+    current_user: dict = Depends(get_current_user),
+) -> ActivitySummary:
+    return ActivitySummary(**get_activity_summary(current_user["id"], periodo))
 
 
 @app.get("/campaigns", response_model=list[CampaignSummary])

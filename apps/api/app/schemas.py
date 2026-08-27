@@ -57,20 +57,37 @@ class DashboardSummary(BaseModel):
 
 
 class ActivitySummary(BaseModel):
+    periodo: str = "7d"
     total_acoes: int = 0
+    acoes_periodo: int = 0
     acoes_hoje: int = 0
     acoes_7_dias: int = 0
+    acoes_30_dias: int = 0
     contatos_feitos: int = 0
+    primeiros_contatos_periodo: int = 0
+    leads_contatados_unicos_periodo: int = 0
     mudancas_status: int = 0
     observacoes_registradas: int = 0
     followups_agendados: int = 0
+    followups_periodo: int = 0
     leads_com_followup_hoje: int = 0
     leads_com_followup_atrasado: int = 0
     respostas_recebidas: int = 0
+    respostas_periodo: int = 0
+    taxa_resposta_primeiro_contato: float = 0
+    contatos_sem_resposta: int = 0
+    tempo_medio_primeira_resposta_dias: float = 0
+    qualificados_periodo: int = 0
     reunioes_marcadas: int = 0
+    reunioes_periodo: int = 0
     propostas_enviadas: int = 0
+    propostas_periodo: int = 0
     fechados: int = 0
+    fechados_periodo: int = 0
     contatos_invalidos: int = 0
+    conversao_contato_reuniao: float = 0
+    conversao_resposta_reuniao: float = 0
+    eficiencia_acoes_resposta: float = 0
 
 
 class LeadActivity(BaseModel):
