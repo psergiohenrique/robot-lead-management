@@ -1,24 +1,10 @@
 import { CampaignsPanel } from "@/components/campaigns-panel";
-import { LeadBaseTabs } from "@/components/lead-base-tabs";
 import { ImportLeadsForm } from "@/components/import-leads-form";
-import { LeadsFilters } from "@/components/leads-filters";
-import { LeadsTable } from "@/components/leads-table";
 import { LogoutButton } from "@/components/logout-button";
-import { Pagination } from "@/components/pagination";
 import { RunSearchForm } from "@/components/run-search-form";
 import { StatCard } from "@/components/stat-card";
-import { getCampaigns, getDashboardSummary, getLeads, getSearchBatches } from "@/lib/api";
+import { getCampaigns, getDashboardSummary } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
-
-const pipeline = [
-  "Novo",
-  "Primeiro contato",
-  "Respondeu",
-  "Diagnóstico enviado",
-  "Reunião marcada",
-  "Proposta",
-  "Fechado",
-];
 
 type HomePageProps = {
   searchParams?: Promise<Record<string, string | string[] | undefined>>;
@@ -29,72 +15,15 @@ function paramValue(params: Record<string, string | string[] | undefined>, key: 
   return Array.isArray(value) ? value[0] : value;
 }
 
-function paramNumber(params: Record<string, string | string[] | undefined>, key: string, fallback: number): number {
-  const value = Number(paramValue(params, key));
-  return Number.isFinite(value) && value >= 0 ? value : fallback;
-}
-
-function currentHref(params: Record<string, string | string[] | undefined>): string {
-  const search = new URLSearchParams();
-
-  for (const [key, value] of Object.entries(params)) {
-    const finalValue = Array.isArray(value) ? value[0] : value;
-    if (finalValue && key !== "status_salvo") search.set(key, finalValue);
-  }
-
-  const query = search.toString();
-  return query ? `/?${query}` : "/";
-}
-
 export default async function HomePage({ searchParams }: HomePageProps) {
   const user = await requireUser();
   const params = (await searchParams) ?? {};
-  const limit = Math.min(Math.max(paramNumber(params, "limit", 12), 1), 100);
-  const offset = paramNumber(params, "offset", 0);
-  const rawBase = paramValue(params, "base") ?? "sem_site";
-  const base = ["sem_site", "todos", "pesquisa"].includes(rawBase) ? rawBase : "sem_site";
-  const batchId = paramValue(params, "batch_id");
   const campaignId = paramValue(params, "campaign_id");
-  const cidade = paramValue(params, "cidade");
-  const segmento = paramValue(params, "segmento");
-  const classificacao = paramValue(params, "classificacao");
-  const semSite = paramValue(params, "sem_site") ?? (base === "sem_site" ? "SIM" : undefined);
-  const statusSalvo = paramValue(params, "status_salvo");
-  const returnTo = currentHref(params);
 
   const [summary, campaigns] = await Promise.all([getDashboardSummary(), getCampaigns()]);
   const selectedCampaignId = campaignId ?? campaigns[0]?.id?.toString();
-  const batches = await getSearchBatches(30, selectedCampaignId);
-  const selectedBatchId = base === "pesquisa" ? batchId ?? batches[0]?.id?.toString() : undefined;
-  const leads = await getLeads({
-    limit,
-    offset,
-    cidade,
-    segmento,
-    classificacao,
-    sem_site: semSite,
-    batch_id: selectedBatchId,
-    campaign_id: selectedCampaignId,
-  });
 
-  const currentBatch = batches.find((batch) => String(batch.id) === selectedBatchId);
   const currentCampaign = campaigns.find((campaign) => String(campaign.id) === selectedCampaignId);
-  const sectionTitle =
-    base === "todos"
-      ? "Todos os leads"
-      : base === "pesquisa"
-        ? `Pesquisa #${selectedBatchId ?? currentBatch?.id ?? "-"}`
-        : "Leads sem site";
-  const sectionHelper =
-    base === "pesquisa" && currentBatch
-      ? `${currentBatch.cidade ?? "Cidade não informada"} / ${currentBatch.segmento ?? "Segmento não informado"}`
-      : base === "todos"
-        ? currentCampaign
-          ? `Base geral da campanha ${currentCampaign.nome}`
-          : "Base geral consolidada"
-        : currentCampaign
-          ? `Primeira abordagem da campanha ${currentCampaign.nome}`
-          : "Primeira abordagem";
 
   const pipelineResumo = [
     { label: "Novo", value: summary.status_novo, helper: "Ainda sem abordagem" },
@@ -123,10 +52,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
             </p>
           </div>
           <div className="rounded-3xl bg-white/10 p-5 ring-1 ring-white/15">
-            <p className="text-sm text-slate-300">Status da conexão</p>
-            <p className="mt-2 text-lg font-bold">
-              {leads.database_configured ? "Neon DB conectado" : "Aguardando Neon DB"}
-            </p>
+            <p className="text-sm text-slate-300">Status do painel</p>
+            <p className="mt-2 text-lg font-bold">Resumo operacional</p>
             <div className="mt-4 flex items-center justify-between gap-4 border-t border-white/10 pt-4">
               <p className="text-sm text-slate-300">{user.email}</p>
               <LogoutButton />
@@ -176,6 +103,33 @@ export default async function HomePage({ searchParams }: HomePageProps) {
       </section>
 
       <CampaignsPanel campaigns={campaigns} activeCampaignId={selectedCampaignId} />
+
+      <section className="grid gap-4 md:grid-cols-3">
+        <a
+          className="rounded-[2rem] bg-slate-950 p-6 text-white shadow-soft transition hover:-translate-y-0.5 hover:shadow-xl"
+          href={selectedCampaignId ? `/hoje?campaign_id=${selectedCampaignId}` : "/hoje"}
+        >
+          <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-300">Operação</p>
+          <h2 className="mt-3 text-2xl font-black">Rotina de hoje</h2>
+          <p className="mt-3 text-sm leading-6 text-slate-300">Veja quem abordar, quem retomar e quais follow-ups estão pendentes.</p>
+        </a>
+        <a
+          className="rounded-[2rem] bg-yellow-300 p-6 text-slate-950 shadow-soft transition hover:-translate-y-0.5 hover:shadow-xl"
+          href={selectedCampaignId ? `/kanban?campaign_id=${selectedCampaignId}` : "/kanban"}
+        >
+          <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-900/70">Funil</p>
+          <h2 className="mt-3 text-2xl font-black">Kanban de leads</h2>
+          <p className="mt-3 text-sm font-bold leading-6 text-slate-700">Acompanhe cada lead por etapa e abra a ficha completa.</p>
+        </a>
+        <a
+          className="rounded-[2rem] bg-white p-6 text-slate-950 shadow-soft ring-1 ring-black/5 transition hover:-translate-y-0.5 hover:shadow-xl"
+          href="/metricas"
+        >
+          <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Gestão</p>
+          <h2 className="mt-3 text-2xl font-black">Métricas BDR</h2>
+          <p className="mt-3 text-sm font-bold leading-6 text-slate-500">Veja contatos feitos, ações registradas e evolução comercial.</p>
+        </a>
+      </section>
 
       <section className="grid gap-6 xl:grid-cols-3">
         <div className="rounded-[2rem] bg-white p-6 shadow-soft ring-1 ring-black/5">
@@ -242,59 +196,16 @@ export default async function HomePage({ searchParams }: HomePageProps) {
         </div>
       </section>
 
-      <section>
-        <LeadBaseTabs
-          activeBase={base}
-          activeBatchId={selectedBatchId}
-          activeCampaignId={selectedCampaignId}
-          batches={batches}
-        />
-
-        <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="mt-6 text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">{sectionHelper}</p>
-            <h2 className="mt-2 text-2xl font-black text-slate-950">{sectionTitle}</h2>
-          </div>
-          <p className="text-sm text-slate-500">{leads.total.toLocaleString("pt-BR")} registros</p>
-        </div>
-
-        <div className="flex flex-col gap-4">
-          {statusSalvo === "ok" ? (
-            <div className="rounded-3xl bg-emerald-50 px-5 py-4 text-sm font-bold text-emerald-800 ring-1 ring-emerald-200">
-              Status do lead salvo com sucesso.
-            </div>
-          ) : null}
-          {statusSalvo === "erro" ? (
-            <div className="rounded-3xl bg-red-50 px-5 py-4 text-sm font-bold text-red-800 ring-1 ring-red-200">
-              Não consegui salvar o status. Confira se a API está online e se o Neon DB está conectado.
-            </div>
-          ) : null}
-          <LeadsFilters
-            cidade={cidade}
-            segmento={segmento}
-            classificacao={classificacao}
-            semSite={semSite}
-            base={base}
-            batchId={selectedBatchId}
-            campaignId={selectedCampaignId}
-          />
-          <LeadsTable leads={leads.items} returnTo={returnTo} />
-          <Pagination
-            total={leads.total}
-            limit={leads.limit}
-            offset={leads.offset}
-            query={{
-              cidade,
-              segmento,
-              classificacao,
-              sem_site: semSite,
-              base,
-              batch_id: selectedBatchId,
-              campaign_id: selectedCampaignId,
-            }}
-          />
-        </div>
-      </section>
+      {currentCampaign ? (
+        <section className="rounded-[2rem] bg-white p-6 shadow-soft ring-1 ring-black/5">
+          <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Campanha ativa</p>
+          <h2 className="mt-2 text-2xl font-black text-slate-950">{currentCampaign.nome}</h2>
+          <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-500">
+            A dashboard fica como visão executiva e ponto de entrada. Para trabalhar os leads, use Rotina de hoje,
+            Kanban ou Métricas.
+          </p>
+        </section>
+      ) : null}
     </main>
   );
 }
