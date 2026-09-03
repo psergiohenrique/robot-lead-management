@@ -1,7 +1,7 @@
 "use client";
 
 import { addLeadObservation, updateLeadFollowup } from "@/lib/actions";
-import type { Lead } from "@/lib/types";
+import type { CampaignSummary, Lead } from "@/lib/types";
 import { criarLinkWhatsApp, criarMensagemWhatsApp, limparTelefoneBrasil } from "@/lib/whatsapp";
 import { useState } from "react";
 import { useFormStatus } from "react-dom";
@@ -11,6 +11,7 @@ import { LeadStatusForm } from "./lead-status-form";
 
 type LeadDetailModalProps = {
   lead: Lead;
+  campaign?: CampaignSummary | null;
   returnTo: string;
   onClose: () => void;
 };
@@ -202,11 +203,12 @@ function ObservationForm({ lead, returnTo }: { lead: Lead; returnTo: string }) {
   );
 }
 
-export function LeadDetailModal({ lead, returnTo, onClose }: LeadDetailModalProps) {
+export function LeadDetailModal({ lead, campaign, returnTo, onClose }: LeadDetailModalProps) {
   const telefoneLimpo = limparTelefoneBrasil(lead);
-  const whatsappLink = criarLinkWhatsApp(lead);
-  const mensagem = criarMensagemWhatsApp(lead);
-  const detailHref = lead.id ? `/kanban/lead/${lead.id}?return_to=${encodeURIComponent(returnTo)}` : "";
+  const whatsappLink = criarLinkWhatsApp(lead, campaign);
+  const mensagem = criarMensagemWhatsApp(lead, campaign);
+  const campaignQuery = campaign?.id ? `&campaign_id=${campaign.id}` : "";
+  const detailHref = lead.id ? `/kanban/lead/${lead.id}?return_to=${encodeURIComponent(returnTo)}${campaignQuery}` : "";
 
   return (
     <div className="fixed inset-0 z-50">

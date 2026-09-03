@@ -24,6 +24,9 @@ export default async function HomePage({ searchParams }: HomePageProps) {
   const selectedCampaignId = campaignId ?? campaigns[0]?.id?.toString();
 
   const currentCampaign = campaigns.find((campaign) => String(campaign.id) === selectedCampaignId);
+  const ofertaAtual =
+    currentCampaign?.oferta_principal ??
+    "Site institucional completo por R$ 499 à vista + R$ 129,90/mês de manutenção, suporte e cuidados contínuos";
 
   const pipelineResumo = [
     { label: "Novo", value: summary.status_novo, helper: "Ainda sem abordagem" },
@@ -164,10 +167,10 @@ export default async function HomePage({ searchParams }: HomePageProps) {
           <div className="grid gap-6 lg:items-start">
             <div>
               <p className="text-sm font-bold uppercase tracking-[0.2em] text-yellow-700">Mensagem atual</p>
-              <h2 className="mt-2 text-3xl font-black text-slate-950">Promoção Codepath</h2>
+              <h2 className="mt-2 text-3xl font-black text-slate-950">{currentCampaign?.nome ?? "Promoção Codepath"}</h2>
               <p className="mt-3 text-sm leading-6 text-slate-500">
-                Esta é a oferta usada no botão de WhatsApp da tabela. O lead abre com a mensagem pronta,
-                mas o envio continua manual.
+                Esta é a oferta da campanha ativa. Ela também será usada na mensagem pronta do WhatsApp
+                quando você trabalhar os leads desta campanha.
               </p>
               <a
                 className="mt-5 inline-flex rounded-2xl bg-yellow-300 px-4 py-3 text-sm font-black text-slate-950 transition hover:bg-yellow-200"
@@ -179,12 +182,8 @@ export default async function HomePage({ searchParams }: HomePageProps) {
               </a>
             </div>
             <div className="rounded-3xl bg-slate-950 p-5 text-white">
-              <p className="font-bold">Site institucional completo</p>
-              <p className="mt-3 text-3xl font-black text-yellow-300">R$ 499 à vista</p>
-              <p className="mt-3 text-sm leading-6 text-slate-300">
-                + R$ 129,90/mês de manutenção, suporte e cuidados contínuos do site enquanto a Codepath
-                cuidar dele.
-              </p>
+              <p className="text-sm font-bold uppercase tracking-[0.18em] text-yellow-300">Oferta principal</p>
+              <p className="mt-3 whitespace-pre-wrap text-2xl font-black leading-tight text-white">{ofertaAtual}</p>
               <ul className="mt-5 grid gap-2 text-sm text-slate-200 sm:grid-cols-2">
                 <li>- Site profissional</li>
                 <li>- Layout responsivo</li>

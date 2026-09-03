@@ -1,4 +1,4 @@
-import type { Lead } from "./types";
+import type { CampaignSummary, Lead } from "./types";
 
 function somenteNumeros(value: string | null | undefined): string {
   return (value ?? "").replace(/\D/g, "");
@@ -18,9 +18,18 @@ export function telefonePareceWhatsApp(telefone: string): boolean {
   return /^55[1-9][0-9]9?[0-9]{8}$/.test(telefone);
 }
 
-export function criarMensagemWhatsApp(lead: Lead): string {
+function ofertaPrincipal(lead: Lead, campaign?: CampaignSummary | null): string {
+  return (
+    campaign?.oferta_principal?.trim() ||
+    lead.oferta_principal?.trim() ||
+    "Site institucional completo por R$ 499 à vista + R$ 129,90/mês de manutenção, suporte e cuidados contínuos"
+  );
+}
+
+export function criarMensagemWhatsApp(lead: Lead, campaign?: CampaignSummary | null): string {
   const cidade = lead.cidade?.trim() || "sua região";
   const segmento = lead.segmento?.trim().toLocaleLowerCase("pt-BR") || "";
+  const oferta = ofertaPrincipal(lead, campaign);
 
   const justificativa =
     segmento.includes("dent") ||
@@ -44,9 +53,7 @@ export function criarMensagemWhatsApp(lead: Lead): string {
     "Sou da *Codepath*. Estamos com uma *condição promocional por tempo limitado* para criação de *site institucional completo*.",
     "",
     "*Promoção Codepath*",
-    "*Site institucional completo*",
-    "*R$ 499 à vista*",
-    "+ *R$ 129,90/mês* de manutenção, suporte e cuidados contínuos do site enquanto a Codepath cuidar dele",
+    oferta,
     "",
     "Inclui:",
     "- Site profissional",
@@ -67,10 +74,10 @@ export function criarMensagemWhatsApp(lead: Lead): string {
   ].join("\n");
 }
 
-export function criarLinkWhatsApp(lead: Lead): string {
+export function criarLinkWhatsApp(lead: Lead, campaign?: CampaignSummary | null): string {
   const telefone = limparTelefoneBrasil(lead);
 
   if (!telefone || !telefonePareceWhatsApp(telefone)) return "";
 
-  return `https://wa.me/${telefone}?text=${encodeURIComponent(criarMensagemWhatsApp(lead))}`;
+  return `https://wa.me/${telefone}?text=${encodeURIComponent(criarMensagemWhatsApp(lead, campaign))}`;
 }

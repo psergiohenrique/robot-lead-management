@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 
-import type { Lead } from "@/lib/types";
+import type { CampaignSummary, Lead } from "@/lib/types";
 import { limparTelefoneBrasil } from "@/lib/whatsapp";
 
 import { LeadDetailModal } from "./lead-detail-modal";
@@ -59,6 +59,7 @@ const statusAliases: Record<string, string> = {
 
 type KanbanBoardProps = {
   leads: Lead[];
+  campaign?: CampaignSummary | null;
   returnTo: string;
 };
 
@@ -74,7 +75,7 @@ function scoreTone(classificacao?: string | null): string {
   return "bg-slate-100 text-slate-600";
 }
 
-export function KanbanBoard({ leads, returnTo }: KanbanBoardProps) {
+export function KanbanBoard({ leads, campaign, returnTo }: KanbanBoardProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
 
   const grouped = columns.map((column) => ({
@@ -176,7 +177,7 @@ export function KanbanBoard({ leads, returnTo }: KanbanBoardProps) {
       </div>
 
       {selectedLead ? (
-        <LeadDetailModal lead={selectedLead} returnTo={returnTo} onClose={() => setSelectedLead(null)} />
+        <LeadDetailModal lead={selectedLead} campaign={campaign} returnTo={returnTo} onClose={() => setSelectedLead(null)} />
       ) : null}
     </>
   );

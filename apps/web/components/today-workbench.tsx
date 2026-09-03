@@ -2,13 +2,14 @@
 
 import { useMemo, useState } from "react";
 
-import type { Lead } from "@/lib/types";
+import type { CampaignSummary, Lead } from "@/lib/types";
 import { criarLinkWhatsApp, limparTelefoneBrasil } from "@/lib/whatsapp";
 
 import { LeadDetailModal } from "./lead-detail-modal";
 
 type TodayWorkbenchProps = {
   leads: Lead[];
+  campaign?: CampaignSummary | null;
   returnTo: string;
 };
 
@@ -160,9 +161,17 @@ function sectionClass(tone: WorkSection["tone"]): string {
   return "bg-white text-slate-950";
 }
 
-function LeadTaskCard({ lead, onOpen }: { lead: Lead; onOpen: () => void }) {
+function LeadTaskCard({
+  lead,
+  campaign,
+  onOpen,
+}: {
+  lead: Lead;
+  campaign?: CampaignSummary | null;
+  onOpen: () => void;
+}) {
   const phone = limparTelefoneBrasil(lead);
-  const whatsappLink = criarLinkWhatsApp(lead);
+  const whatsappLink = criarLinkWhatsApp(lead, campaign);
   const status = normalizeStatus(lead.status_contato);
 
   return (
@@ -219,7 +228,7 @@ function LeadTaskCard({ lead, onOpen }: { lead: Lead; onOpen: () => void }) {
   );
 }
 
-export function TodayWorkbench({ leads, returnTo }: TodayWorkbenchProps) {
+export function TodayWorkbench({ leads, campaign, returnTo }: TodayWorkbenchProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const sections = useMemo(() => buildSections(leads), [leads]);
   const totalTasks = uniqueLeads(sections.flatMap((section) => section.leads)).length;
@@ -291,7 +300,12 @@ export function TodayWorkbench({ leads, returnTo }: TodayWorkbenchProps) {
             <div className="mt-5 grid max-h-[44rem] gap-3 overflow-y-auto pr-1">
               {section.leads.length ? (
                 section.leads.map((lead) => (
-                  <LeadTaskCard key={`${section.id}-${lead.id ?? lead.nome}`} lead={lead} onOpen={() => setSelectedLead(lead)} />
+                  <LeadTaskCard
+                    key={`${section.id}-${lead.id ?? lead.nome}`}
+                    lead={lead}
+                    campaign={campaign}
+                    onOpen={() => setSelectedLead(lead)}
+                  />
                 ))
               ) : (
                 <div className="rounded-3xl border border-dashed border-slate-300 bg-white/70 p-6 text-center text-sm font-bold text-slate-500">
@@ -304,7 +318,7 @@ export function TodayWorkbench({ leads, returnTo }: TodayWorkbenchProps) {
       </section>
 
       {selectedLead ? (
-        <LeadDetailModal lead={selectedLead} returnTo={returnTo} onClose={() => setSelectedLead(null)} />
+        <LeadDetailModal lead={selectedLead} campaign={campaign} returnTo={returnTo} onClose={() => setSelectedLead(null)} />
       ) : null}
     </>
   );

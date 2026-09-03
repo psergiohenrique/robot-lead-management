@@ -164,7 +164,7 @@ export default async function KanbanPage({ searchParams }: KanbanPageProps) {
         </div>
       ) : null}
 
-      <KanbanBoard leads={leads.items} returnTo={returnTo} />
+      <KanbanBoard leads={leads.items} campaign={currentCampaign} returnTo={returnTo} />
     </main>
   );
 }

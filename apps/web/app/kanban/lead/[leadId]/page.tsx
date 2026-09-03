@@ -2,7 +2,7 @@ import { notFound } from "next/navigation";
 
 import { LeadMessageCard } from "@/components/lead-message-card";
 import { LeadStatusForm } from "@/components/lead-status-form";
-import { getLead } from "@/lib/api";
+import { getCampaigns, getLead } from "@/lib/api";
 import { requireUser } from "@/lib/auth";
 import { criarLinkWhatsApp, criarMensagemWhatsApp, limparTelefoneBrasil } from "@/lib/whatsapp";
 
@@ -53,17 +53,19 @@ export default async function LeadDetailPage({ params, searchParams }: LeadDetai
   const { leadId } = await params;
   const query = (await searchParams) ?? {};
   const returnTo = safeReturnTo(paramValue(query, "return_to"));
+  const campaignId = paramValue(query, "campaign_id");
   const statusSalvo = paramValue(query, "status_salvo");
   const currentDetailHref = detailHref(leadId, returnTo);
-  const lead = await getLead(leadId);
+  const [lead, campaigns] = await Promise.all([getLead(leadId), getCampaigns()]);
+  const currentCampaign = campaigns.find((campaign) => String(campaign.id) === campaignId) ?? campaigns[0];
 
   if (!lead) {
     notFound();
   }
 
   const telefoneLimpo = limparTelefoneBrasil(lead);
-  const whatsappLink = criarLinkWhatsApp(lead);
-  const mensagem = criarMensagemWhatsApp(lead);
+  const whatsappLink = criarLinkWhatsApp(lead, currentCampaign);
+  const mensagem = criarMensagemWhatsApp(lead, currentCampaign);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-5 py-8 sm:px-8">

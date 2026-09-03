@@ -137,7 +137,7 @@ export default async function HojePage({ searchParams }: HojePageProps) {
         </div>
       </section>
 
-      <TodayWorkbench leads={leads.items} returnTo={returnTo} />
+      <TodayWorkbench leads={leads.items} campaign={currentCampaign} returnTo={returnTo} />
     </main>
   );
 }
