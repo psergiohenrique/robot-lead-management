@@ -219,6 +219,46 @@ def create_campaign(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     return campaign
 
 
+def update_campaign(campaign_id: int, user_id: int, payload: dict[str, Any]) -> dict[str, Any] | None:
+    if not database_configured():
+        raise RuntimeError("DATABASE_URL não configurada.")
+
+    ensure_campaigns_table()
+    values = {
+        "id": campaign_id,
+        "user_id": user_id,
+        "nome": payload.get("nome") or "Campanha sem nome",
+        "objetivo": payload.get("objetivo") or None,
+        "oferta_principal": payload.get("oferta_principal") or None,
+        "criterio_principal": payload.get("criterio_principal") or None,
+        "canal": payload.get("canal") or "WhatsApp manual",
+        "status": payload.get("status") or "Ativa",
+    }
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                UPDATE campaigns
+                SET nome = %(nome)s,
+                    objetivo = %(objetivo)s,
+                    oferta_principal = %(oferta_principal)s,
+                    criterio_principal = %(criterio_principal)s,
+                    canal = %(canal)s,
+                    status = %(status)s,
+                    updated_at = now()
+                WHERE id = %(id)s
+                  AND user_id = %(user_id)s
+                RETURNING *
+                """,
+                values,
+            )
+            row = cursor.fetchone()
+        connection.commit()
+
+    return dict(row) if row else None
+
+
 def get_or_create_default_campaign(user_id: int) -> dict[str, Any]:
     ensure_campaigns_table()
     with get_connection() as connection:

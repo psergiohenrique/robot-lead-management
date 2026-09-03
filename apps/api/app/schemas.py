@@ -144,6 +144,15 @@ class CampaignCreate(BaseModel):
     status: str = Field(default="Ativa", max_length=40)
 
 
+class CampaignUpdate(BaseModel):
+    nome: str = Field(min_length=2, max_length=120)
+    objetivo: str | None = Field(default=None, max_length=240)
+    oferta_principal: str | None = Field(default=None, max_length=240)
+    criterio_principal: str | None = Field(default=None, max_length=240)
+    canal: str | None = Field(default=None, max_length=80)
+    status: str = Field(default="Ativa", max_length=40)
+
+
 class CampaignSummary(BaseModel):
     id: int
     nome: str

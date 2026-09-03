@@ -20,6 +20,11 @@ export type CreateCampaignState = {
   message: string;
 };
 
+export type UpdateCampaignState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
+
 export type ImportLeadsState = {
   status: "idle" | "success" | "error";
   message: string;
@@ -121,6 +126,67 @@ export async function createCampaign(
     const campaign = data as CampaignSummary;
     revalidatePath("/");
     return { status: "success", message: `Campanha "${campaign.nome}" criada com sucesso.` };
+  } catch {
+    return { status: "error", message: "Não foi possível conectar à API." };
+  }
+}
+
+export async function updateCampaign(
+  _prevState: UpdateCampaignState,
+  formData: FormData
+): Promise<UpdateCampaignState> {
+  const campaignId = String(formData.get("campaign_id") ?? "").trim();
+  const nome = String(formData.get("nome") ?? "").trim();
+  const objetivo = String(formData.get("objetivo") ?? "").trim();
+  const ofertaPrincipal = String(formData.get("oferta_principal") ?? "").trim();
+  const criterioPrincipal = String(formData.get("criterio_principal") ?? "").trim();
+  const canal = String(formData.get("canal") ?? "").trim();
+  const status = String(formData.get("status") ?? "").trim();
+
+  if (!campaignId) {
+    return { status: "error", message: "Selecione uma campanha para editar." };
+  }
+
+  if (!nome) {
+    return { status: "error", message: "Informe o nome da campanha." };
+  }
+
+  const token = await getSessionToken();
+  if (!token) {
+    return { status: "error", message: "Sessão expirada. Faça login novamente." };
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}`, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({
+        nome,
+        objetivo: objetivo || undefined,
+        oferta_principal: ofertaPrincipal || undefined,
+        criterio_principal: criterioPrincipal || undefined,
+        canal: canal || "WhatsApp manual",
+        status: status || "Ativa",
+      }),
+      cache: "no-store",
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const detail = typeof data?.detail === "string" ? data.detail : "Falha ao atualizar campanha.";
+      return { status: "error", message: detail };
+    }
+
+    const campaign = data as CampaignSummary;
+    revalidatePath("/");
+    revalidatePath("/hoje");
+    revalidatePath("/kanban");
+    revalidatePath("/metricas");
+    return { status: "success", message: `Campanha "${campaign.nome}" atualizada com sucesso.` };
   } catch {
     return { status: "error", message: "Não foi possível conectar à API." };
   }

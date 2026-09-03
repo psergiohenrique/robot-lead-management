@@ -17,6 +17,7 @@ from app.repositories import (
     list_campaigns,
     list_leads,
     list_search_batches,
+    update_campaign,
     update_lead_contact,
 )
 from app.schemas import (
@@ -24,6 +25,7 @@ from app.schemas import (
     ActivitySummary,
     CampaignCreate,
     CampaignSummary,
+    CampaignUpdate,
     DashboardSummary,
     HealthResponse,
     ImportLeadsResult,
@@ -111,6 +113,21 @@ def new_campaign(payload: CampaignCreate, current_user: dict = Depends(get_curre
     except RuntimeError as erro:
         raise HTTPException(status_code=502, detail=str(erro)) from erro
     return CampaignSummary(**{**campaign, "total_lotes": 0, "total_leads": 0, "total_sem_site": 0})
+
+
+@app.put("/campaigns/{campaign_id}", response_model=CampaignSummary)
+def edit_campaign(
+    campaign_id: int,
+    payload: CampaignUpdate,
+    current_user: dict = Depends(get_current_user),
+) -> CampaignSummary:
+    try:
+        campaign = update_campaign(campaign_id, current_user["id"], payload.model_dump())
+    except RuntimeError as erro:
+        raise HTTPException(status_code=502, detail=str(erro)) from erro
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campanha não encontrada.")
+    return CampaignSummary(**campaign)
 
 
 @app.get("/leads", response_model=LeadListResponse)
