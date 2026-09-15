@@ -9,7 +9,9 @@
 
 body {
   min-height: 100vh;
-  background: #ff00ff;
+  background:
+    radial-gradient(circle at top left, rgba(250, 204, 21, 0.14), transparent 32rem),
+    linear-gradient(180deg, #f8fafc 0%, #eef2f7 100%);
 }
 
 * {
