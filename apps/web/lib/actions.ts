@@ -30,6 +30,53 @@ export type ImportLeadsState = {
   message: string;
 };
 
+export type RescoreCampaignState = {
+  status: "idle" | "success" | "error";
+  message: string;
+};
+
+const MAX_BAIRROS = 15;
+
+function lerLista(value: FormDataEntryValue | null): string[] {
+  const itens = String(value ?? "")
+    .split(/[\n,;]+/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+  return Array.from(new Set(itens));
+}
+
+const CAMPOS_SCORE_NUMERICOS = [
+  "peso_sem_site",
+  "peso_so_rede_social",
+  "peso_nota_google",
+  "nota_minima",
+  "peso_avaliacoes",
+  "minimo_avaliacoes",
+  "peso_telefone",
+  "peso_whatsapp_provavel",
+  "peso_prioridade_alta",
+  "peso_segmento_prioritario",
+  "peso_cidade_prioritaria",
+  "penalidade_fechado_temporariamente",
+  "limite_quente",
+  "limite_morno",
+] as const;
+
+function lerScoreConfig(formData: FormData): Record<string, number | string[]> | undefined {
+  if (!formData.get("score_config_presente")) return undefined;
+
+  const config: Record<string, number | string[]> = {};
+  for (const campo of CAMPOS_SCORE_NUMERICOS) {
+    const bruto = String(formData.get(`sc_${campo}`) ?? "").trim().replace(",", ".");
+    if (!bruto) continue;
+    const numero = Number(bruto);
+    if (Number.isFinite(numero)) config[campo] = numero;
+  }
+  config.segmentos_prioritarios = lerLista(formData.get("sc_segmentos_prioritarios"));
+  config.cidades_prioritarias = lerLista(formData.get("sc_cidades_prioritarias"));
+  return config;
+}
+
 export async function runSearchBatch(
   _prevState: RunSearchState,
   formData: FormData
@@ -38,9 +85,17 @@ export async function runSearchBatch(
   const segmento = String(formData.get("segmento") ?? "").trim();
   const limite = Number.parseInt(String(formData.get("limite") ?? "20"), 10) || 20;
   const campaignId = Number.parseInt(String(formData.get("campaign_id") ?? ""), 10);
+  const bairros = lerLista(formData.get("bairros"));
 
   if (!cidade || !segmento) {
     return { status: "error", message: "Informe cidade e segmento." };
+  }
+
+  if (bairros.length > MAX_BAIRROS) {
+    return {
+      status: "error",
+      message: `Use no máximo ${MAX_BAIRROS} bairros por busca. Divida em duas buscas.`,
+    };
   }
 
   const token = await getSessionToken();
@@ -59,6 +114,7 @@ export async function runSearchBatch(
         cidade,
         segmento,
         limite,
+        bairros,
         campaign_id: Number.isFinite(campaignId) ? campaignId : undefined,
       }),
       cache: "no-store",
@@ -73,9 +129,11 @@ export async function runSearchBatch(
 
     const resultado = data as SearchBatchResult;
     revalidatePath("/");
+    revalidatePath("/kanban");
+    revalidatePath("/hoje");
     return {
       status: "success",
-      message: `${resultado.total_encontrado} empresa(s) encontrada(s) — ${resultado.total_sem_site} sem site (${resultado.novos_leads} novo(s), ${resultado.leads_atualizados} atualizado(s)).`,
+      message: `${resultado.message} (${resultado.novos_leads} novo(s), ${resultado.leads_atualizados} atualizado(s)).`,
     };
   } catch {
     return { status: "error", message: "Não foi possível conectar à API." };
@@ -142,6 +200,7 @@ export async function updateCampaign(
   const criterioPrincipal = String(formData.get("criterio_principal") ?? "").trim();
   const canal = String(formData.get("canal") ?? "").trim();
   const status = String(formData.get("status") ?? "").trim();
+  const scoreConfig = lerScoreConfig(formData);
 
   if (!campaignId) {
     return { status: "error", message: "Selecione uma campanha para editar." };
@@ -170,6 +229,7 @@ export async function updateCampaign(
         criterio_principal: criterioPrincipal || undefined,
         canal: canal || "WhatsApp manual",
         status: status || "Ativa",
+        score_config: scoreConfig,
       }),
       cache: "no-store",
     });
@@ -187,6 +247,44 @@ export async function updateCampaign(
     revalidatePath("/kanban");
     revalidatePath("/metricas");
     return { status: "success", message: `Campanha "${campaign.nome}" atualizada com sucesso.` };
+  } catch {
+    return { status: "error", message: "Não foi possível conectar à API." };
+  }
+}
+
+export async function rescoreCampaign(
+  _prevState: RescoreCampaignState,
+  formData: FormData
+): Promise<RescoreCampaignState> {
+  const campaignId = String(formData.get("campaign_id") ?? "").trim();
+
+  if (!campaignId) {
+    return { status: "error", message: "Selecione uma campanha." };
+  }
+
+  const token = await getSessionToken();
+  if (!token) {
+    return { status: "error", message: "Sessão expirada. Faça login novamente." };
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/campaigns/${campaignId}/rescore`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${token}` },
+      cache: "no-store",
+    });
+
+    const data = await response.json().catch(() => null);
+
+    if (!response.ok) {
+      const detail = typeof data?.detail === "string" ? data.detail : "Falha ao recalcular o score.";
+      return { status: "error", message: detail };
+    }
+
+    revalidatePath("/");
+    revalidatePath("/hoje");
+    revalidatePath("/kanban");
+    return { status: "success", message: String(data?.message ?? "Score recalculado.") };
   } catch {
     return { status: "error", message: "Não foi possível conectar à API." };
   }

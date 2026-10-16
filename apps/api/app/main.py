@@ -17,6 +17,7 @@ from app.repositories import (
     list_campaigns,
     list_leads,
     list_search_batches,
+    recalcular_score_campanha,
     update_campaign,
     update_lead_contact,
 )
@@ -34,6 +35,7 @@ from app.schemas import (
     MagicLinkRequest,
     MagicLinkRequestResponse,
     MagicLinkVerify,
+    ScoreRecalculoResult,
     SearchBatchCreate,
     SearchBatchResult,
     SearchBatchSummary,
@@ -130,6 +132,22 @@ def edit_campaign(
     return CampaignSummary(**campaign)
 
 
+@app.post("/campaigns/{campaign_id}/rescore", response_model=ScoreRecalculoResult)
+def rescore_campaign(
+    campaign_id: int, current_user: dict = Depends(get_current_user)
+) -> ScoreRecalculoResult:
+    try:
+        total = recalcular_score_campanha(campaign_id, current_user["id"])
+    except RuntimeError as erro:
+        raise HTTPException(status_code=502, detail=str(erro)) from erro
+    if total is None:
+        raise HTTPException(status_code=404, detail="Campanha não encontrada.")
+    return ScoreRecalculoResult(
+        total_recalculado=total,
+        message=f"Score recalculado para {total} lead(s) desta campanha.",
+    )
+
+
 @app.get("/leads", response_model=LeadListResponse)
 def leads(
     limit: int = Query(default=50, ge=1, le=1000),
@@ -191,6 +209,7 @@ def create_search_batch(
             limite=payload.limite,
             nome_lote=payload.nome_lote,
             campaign_id=payload.campaign_id,
+            bairros=payload.bairros,
         )
     except RuntimeError as erro:
         raise HTTPException(status_code=502, detail=str(erro)) from erro

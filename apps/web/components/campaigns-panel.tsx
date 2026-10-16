@@ -2,8 +2,15 @@
 
 import { useActionState } from "react";
 
-import { createCampaign, updateCampaign, type CreateCampaignState, type UpdateCampaignState } from "@/lib/actions";
-import type { CampaignSummary } from "@/lib/types";
+import {
+  createCampaign,
+  rescoreCampaign,
+  updateCampaign,
+  type CreateCampaignState,
+  type RescoreCampaignState,
+  type UpdateCampaignState,
+} from "@/lib/actions";
+import type { CampaignSummary, ScoreConfig } from "@/lib/types";
 
 type CampaignsPanelProps = {
   campaigns: CampaignSummary[];
@@ -12,6 +19,35 @@ type CampaignsPanelProps = {
 
 const initialState: CreateCampaignState = { status: "idle", message: "" };
 const updateInitialState: UpdateCampaignState = { status: "idle", message: "" };
+const rescoreInitialState: RescoreCampaignState = { status: "idle", message: "" };
+
+type ScoreFieldProps = {
+  name: string;
+  label: string;
+  value: number | undefined;
+  hint?: string;
+  step?: string;
+  min?: number;
+  max?: number;
+};
+
+function ScoreField({ name, label, value, hint, step = "1", min = -10, max = 10 }: ScoreFieldProps) {
+  return (
+    <label className="flex flex-col gap-1 text-sm">
+      <span className="font-bold text-slate-700">{label}</span>
+      <input
+        name={`sc_${name}`}
+        type="number"
+        step={step}
+        min={min}
+        max={max}
+        defaultValue={value ?? ""}
+        className="rounded-2xl border border-slate-200 px-3 py-2 outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100"
+      />
+      {hint ? <span className="text-xs text-slate-500">{hint}</span> : null}
+    </label>
+  );
+}
 
 function campaignHref(campaignId: number): string {
   return `/?base=sem_site&campaign_id=${campaignId}`;
@@ -20,7 +56,9 @@ function campaignHref(campaignId: number): string {
 export function CampaignsPanel({ campaigns, activeCampaignId }: CampaignsPanelProps) {
   const [createState, createFormAction] = useActionState(createCampaign, initialState);
   const [updateState, updateFormAction] = useActionState(updateCampaign, updateInitialState);
+  const [rescoreState, rescoreFormAction] = useActionState(rescoreCampaign, rescoreInitialState);
   const activeCampaign = campaigns.find((campaign) => String(campaign.id) === activeCampaignId) ?? campaigns[0];
+  const score: Partial<ScoreConfig> = activeCampaign?.score_config ?? {};
 
   return (
     <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
@@ -142,12 +180,115 @@ export function CampaignsPanel({ campaigns, activeCampaignId }: CampaignsPanelPr
                   </select>
                 </label>
               </div>
+              <details className="rounded-3xl bg-slate-50 p-4 ring-1 ring-black/5">
+                <summary className="cursor-pointer text-sm font-black text-slate-950">
+                  Pontuação dos leads (score desta campanha)
+                </summary>
+                <input type="hidden" name="score_config_presente" value="1" />
+                <p className="mt-3 text-xs leading-5 text-slate-500">
+                  Defina quanto cada característica vale na nota do lead. Vale para as próximas buscas; use
+                  &quot;Recalcular score&quot; abaixo para aplicar aos leads que já existem.
+                </p>
+                <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                  <ScoreField name="peso_sem_site" label="Sem site" value={score.peso_sem_site} />
+                  <ScoreField name="peso_so_rede_social" label="Só rede social" value={score.peso_so_rede_social} />
+                  <ScoreField name="peso_nota_google" label="Nota Google alta" value={score.peso_nota_google} />
+                  <ScoreField
+                    name="nota_minima"
+                    label="Nota mínima (0 a 5)"
+                    value={score.nota_minima}
+                    step="0.1"
+                    min={0}
+                    max={5}
+                  />
+                  <ScoreField name="peso_avaliacoes" label="Muitas avaliações" value={score.peso_avaliacoes} />
+                  <ScoreField
+                    name="minimo_avaliacoes"
+                    label="Mínimo de avaliações"
+                    value={score.minimo_avaliacoes}
+                    min={0}
+                    max={100000}
+                  />
+                  <ScoreField name="peso_telefone" label="Tem telefone" value={score.peso_telefone} />
+                  <ScoreField
+                    name="peso_whatsapp_provavel"
+                    label="WhatsApp provável"
+                    value={score.peso_whatsapp_provavel}
+                  />
+                  <ScoreField
+                    name="peso_prioridade_alta"
+                    label="Prioridade alta"
+                    value={score.peso_prioridade_alta}
+                  />
+                  <ScoreField
+                    name="peso_segmento_prioritario"
+                    label="Segmento prioritário"
+                    value={score.peso_segmento_prioritario}
+                  />
+                  <ScoreField
+                    name="peso_cidade_prioritaria"
+                    label="Cidade prioritária"
+                    value={score.peso_cidade_prioritaria}
+                  />
+                  <ScoreField
+                    name="penalidade_fechado_temporariamente"
+                    label="Desconto: fechada temporariamente"
+                    value={score.penalidade_fechado_temporariamente}
+                    min={0}
+                  />
+                  <ScoreField
+                    name="limite_quente"
+                    label="Nota para ser Quente"
+                    value={score.limite_quente}
+                    min={0}
+                    max={100}
+                  />
+                  <ScoreField
+                    name="limite_morno"
+                    label="Nota para ser Morno"
+                    value={score.limite_morno}
+                    min={0}
+                    max={100}
+                  />
+                </div>
+                <label className="mt-3 flex flex-col gap-1 text-sm">
+                  <span className="font-bold text-slate-700">Segmentos prioritários</span>
+                  <textarea
+                    name="sc_segmentos_prioritarios"
+                    rows={2}
+                    defaultValue={(score.segmentos_prioritarios ?? []).join(", ")}
+                    placeholder="Ex.: dentista, clinica estetica"
+                    className="rounded-2xl border border-slate-200 px-3 py-2 outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100"
+                  />
+                </label>
+                <label className="mt-3 flex flex-col gap-1 text-sm">
+                  <span className="font-bold text-slate-700">Cidades prioritárias</span>
+                  <textarea
+                    name="sc_cidades_prioritarias"
+                    rows={2}
+                    defaultValue={(score.cidades_prioritarias ?? []).join(", ")}
+                    placeholder="Ex.: Maringá, Londrina"
+                    className="rounded-2xl border border-slate-200 px-3 py-2 outline-none transition focus:border-yellow-400 focus:ring-4 focus:ring-yellow-100"
+                  />
+                </label>
+              </details>
               <button className="w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:bg-slate-800">
                 Salvar campanha
               </button>
               {updateState.status !== "idle" ? (
                 <p className={`text-sm font-bold ${updateState.status === "success" ? "text-emerald-600" : "text-red-600"}`}>
                   {updateState.message}
+                </p>
+              ) : null}
+            </form>
+            <form action={rescoreFormAction} className="mt-3 space-y-2">
+              <input type="hidden" name="campaign_id" value={activeCampaign.id} />
+              <button className="w-full rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 ring-1 ring-black/10 transition hover:bg-yellow-50">
+                Recalcular score dos leads desta campanha
+              </button>
+              {rescoreState.status !== "idle" ? (
+                <p className={`text-sm font-bold ${rescoreState.status === "success" ? "text-emerald-600" : "text-red-600"}`}>
+                  {rescoreState.message}
                 </p>
               ) : null}
             </form>

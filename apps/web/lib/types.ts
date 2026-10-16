@@ -73,6 +73,8 @@ export type Lead = {
   quantidade_avaliacoes?: number | null;
   site_cadastrado?: string | null;
   sem_site_cadastrado?: string | null;
+  tipo_presenca_web?: string | null;
+  business_status?: string | null;
   score_oportunidade?: number | null;
   classificacao_lead?: string | null;
   prioridade?: string | null;
@@ -106,6 +108,25 @@ export type LeadListResponse = {
   database_configured: boolean;
 };
 
+export type ScoreConfig = {
+  peso_sem_site: number;
+  peso_so_rede_social: number;
+  peso_nota_google: number;
+  nota_minima: number;
+  peso_avaliacoes: number;
+  minimo_avaliacoes: number;
+  peso_telefone: number;
+  peso_whatsapp_provavel: number;
+  peso_prioridade_alta: number;
+  peso_segmento_prioritario: number;
+  segmentos_prioritarios: string[];
+  peso_cidade_prioritaria: number;
+  cidades_prioritarias: string[];
+  penalidade_fechado_temporariamente: number;
+  limite_quente: number;
+  limite_morno: number;
+};
+
 export type CampaignSummary = {
   id: number;
   nome: string;
@@ -114,6 +135,7 @@ export type CampaignSummary = {
   criterio_principal?: string | null;
   canal?: string | null;
   status?: string | null;
+  score_config?: Partial<ScoreConfig> | null;
   total_lotes: number;
   total_leads: number;
   total_sem_site: number;
@@ -126,8 +148,13 @@ export type SearchBatchResult = {
   status: string;
   total_encontrado: number;
   total_sem_site: number;
+  total_so_rede_social?: number;
   novos_leads: number;
   leads_atualizados: number;
+  descartados_fechados?: number;
+  duplicados?: number;
+  buscas_executadas?: number;
+  buscas_puladas?: number;
   message: string;
 };
 

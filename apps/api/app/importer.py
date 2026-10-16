@@ -9,6 +9,8 @@ from typing import Any
 
 from openpyxl import load_workbook
 
+from app.places import analisar_whatsapp, classificar_presenca_web, sem_site_por_presenca
+
 
 def _normalizar_texto(value: Any) -> str:
     texto = str(value or "").strip().lower()
@@ -204,11 +206,7 @@ def _telefone_limpo(telefone: str | None, telefone_limpo: str | None) -> str | N
 def _whatsapp_status(telefone_limpo: str | None, informado: str | None) -> str:
     if informado:
         return informado
-    if not telefone_limpo:
-        return "Sem telefone"
-    if re.match(r"^55[1-9][0-9]9[0-9]{8}$", telefone_limpo):
-        return "Provável WhatsApp"
-    return "Verificar"
+    return analisar_whatsapp(telefone_limpo)
 
 
 def _place_id(row: dict[str, Any]) -> str:
@@ -292,8 +290,9 @@ def _limpar_row(row: dict[str, Any]) -> dict[str, Any]:
 
     cleaned["telefone_limpo"] = _telefone_limpo(cleaned.get("telefone"), cleaned.get("telefone_limpo"))
     cleaned["whatsapp_status"] = _whatsapp_status(cleaned.get("telefone_limpo"), cleaned.get("whatsapp_status"))
-    cleaned["sem_site_cadastrado"] = cleaned.get("sem_site_cadastrado") or (
-        "SIM" if not cleaned.get("site_cadastrado") else "NÃO"
+    cleaned["tipo_presenca_web"] = classificar_presenca_web(cleaned.get("site_cadastrado"))
+    cleaned["sem_site_cadastrado"] = cleaned.get("sem_site_cadastrado") or sem_site_por_presenca(
+        cleaned["tipo_presenca_web"]
     )
     cleaned["status_contato"] = _inferir_status(cleaned)
     cleaned["place_id"] = _place_id(cleaned)

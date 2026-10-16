@@ -62,7 +62,9 @@ export function criarMensagemWhatsApp(lead: Lead, campaign?: CampaignSummary | n
     "- Suporte direto da Codepath",
     "- *Vagas limitadas nessa condição promocional*",
     "",
-    `Vi que vocês aparecem no Google em ${cidade}, mas não encontrei um *site cadastrado no perfil*.`,
+    lead.tipo_presenca_web === "Só rede social"
+      ? `Vi que vocês aparecem no Google em ${cidade}, mas o perfil só leva para uma rede social, sem um *site próprio*.`
+      : `Vi que vocês aparecem no Google em ${cidade}, mas não encontrei um *site cadastrado no perfil*.`,
     "",
     justificativa,
     "",
@@ -77,6 +79,7 @@ export function criarMensagemWhatsApp(lead: Lead, campaign?: CampaignSummary | n
 export function criarLinkWhatsApp(lead: Lead, campaign?: CampaignSummary | null): string {
   const telefone = limparTelefoneBrasil(lead);
 
+  if (lead.whatsapp_status === "Inválido") return "";
   if (!telefone || !telefonePareceWhatsApp(telefone)) return "";
 
   return `https://wa.me/${telefone}?text=${encodeURIComponent(criarMensagemWhatsApp(lead, campaign))}`;

@@ -155,6 +155,7 @@ export default async function LeadDetailPage({ params, searchParams }: LeadDetai
             <InfoItem label="Telefone limpo" value={telefoneLimpo || "-"} />
             <InfoItem label="WhatsApp" value={lead.whatsapp_status} />
             <InfoItem label="Sem site cadastrado" value={lead.sem_site_cadastrado} />
+            <InfoItem label="Presença na web" value={lead.tipo_presenca_web} />
             <InfoItem label="Cidade" value={lead.cidade} />
             <InfoItem label="Região" value={lead.regiao} />
             <InfoItem label="Segmento" value={lead.segmento} />

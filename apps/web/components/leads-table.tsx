@@ -45,6 +45,11 @@ export function LeadsTable({ leads, returnTo = "/" }: LeadsTableProps) {
                   <td className="px-5 py-4">
                     <p className="font-bold text-slate-950">{lead.nome}</p>
                     <p className="text-xs text-slate-500">{lead.telefone || telefoneLimpo || "Sem telefone"}</p>
+                    {lead.tipo_presenca_web === "Só rede social" ? (
+                      <span className="mt-1 inline-flex rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-bold text-orange-900">
+                        Só rede social
+                      </span>
+                    ) : null}
                   </td>
                   <td className="px-5 py-4 text-slate-700">{lead.cidade ?? "-"}</td>
                   <td className="px-5 py-4 text-slate-700">{lead.segmento ?? "-"}</td>

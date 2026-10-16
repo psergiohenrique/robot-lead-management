@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from typing import Any
 
 from pydantic import BaseModel, EmailStr, Field
 
@@ -116,6 +117,8 @@ class Lead(BaseModel):
     quantidade_avaliacoes: int | None = None
     site_cadastrado: str | None = None
     sem_site_cadastrado: str | None = None
+    tipo_presenca_web: str | None = None
+    business_status: str | None = None
     score_oportunidade: int | None = None
     classificacao_lead: str | None = None
     prioridade: str | None = None
@@ -135,6 +138,25 @@ class LeadListResponse(BaseModel):
     database_configured: bool
 
 
+class ScoreConfig(BaseModel):
+    peso_sem_site: int | None = Field(default=None, ge=-10, le=10)
+    peso_so_rede_social: int | None = Field(default=None, ge=-10, le=10)
+    peso_nota_google: int | None = Field(default=None, ge=-10, le=10)
+    nota_minima: float | None = Field(default=None, ge=0, le=5)
+    peso_avaliacoes: int | None = Field(default=None, ge=-10, le=10)
+    minimo_avaliacoes: int | None = Field(default=None, ge=0, le=100000)
+    peso_telefone: int | None = Field(default=None, ge=-10, le=10)
+    peso_whatsapp_provavel: int | None = Field(default=None, ge=-10, le=10)
+    peso_prioridade_alta: int | None = Field(default=None, ge=-10, le=10)
+    peso_segmento_prioritario: int | None = Field(default=None, ge=-10, le=10)
+    segmentos_prioritarios: list[str] | None = Field(default=None, max_length=50)
+    peso_cidade_prioritaria: int | None = Field(default=None, ge=-10, le=10)
+    cidades_prioritarias: list[str] | None = Field(default=None, max_length=50)
+    penalidade_fechado_temporariamente: int | None = Field(default=None, ge=0, le=10)
+    limite_quente: int | None = Field(default=None, ge=0, le=100)
+    limite_morno: int | None = Field(default=None, ge=0, le=100)
+
+
 class CampaignCreate(BaseModel):
     nome: str = Field(default="Venda de site institucional", min_length=2, max_length=120)
     objetivo: str | None = Field(default="Vender site institucional para empresas sem site", max_length=240)
@@ -142,6 +164,7 @@ class CampaignCreate(BaseModel):
     criterio_principal: str | None = Field(default="Empresas sem site cadastrado no Google", max_length=240)
     canal: str = Field(default="WhatsApp manual", max_length=80)
     status: str = Field(default="Ativa", max_length=40)
+    score_config: ScoreConfig | None = None
 
 
 class CampaignUpdate(BaseModel):
@@ -151,6 +174,12 @@ class CampaignUpdate(BaseModel):
     criterio_principal: str | None = Field(default=None, max_length=240)
     canal: str | None = Field(default=None, max_length=80)
     status: str = Field(default="Ativa", max_length=40)
+    score_config: ScoreConfig | None = None
+
+
+class ScoreRecalculoResult(BaseModel):
+    total_recalculado: int
+    message: str
 
 
 class CampaignSummary(BaseModel):
@@ -161,6 +190,7 @@ class CampaignSummary(BaseModel):
     criterio_principal: str | None = None
     canal: str | None = None
     status: str | None = None
+    score_config: dict[str, Any] = Field(default_factory=dict)
     total_lotes: int = 0
     total_leads: int = 0
     total_sem_site: int = 0
@@ -188,6 +218,7 @@ class SearchBatchCreate(BaseModel):
     segmento: str
     prioridade: str = "Alta"
     limite: int = Field(default=100, ge=1, le=500)
+    bairros: list[str] = Field(default_factory=list, max_length=15)
 
 
 class SearchBatchResult(BaseModel):
@@ -195,8 +226,13 @@ class SearchBatchResult(BaseModel):
     status: str
     total_encontrado: int
     total_sem_site: int
+    total_so_rede_social: int = 0
     novos_leads: int
     leads_atualizados: int
+    descartados_fechados: int = 0
+    duplicados: int = 0
+    buscas_executadas: int = 1
+    buscas_puladas: int = 0
     message: str
 
 

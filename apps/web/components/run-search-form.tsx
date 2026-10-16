@@ -82,8 +82,25 @@ export function RunSearchForm({ campaigns, activeCampaignId }: RunSearchFormProp
       </div>
 
       <div>
+        <label htmlFor="bairros" className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">
+          Bairros (opcional)
+        </label>
+        <textarea
+          id="bairros"
+          name="bairros"
+          rows={2}
+          placeholder="Ex.: Centro, Zona 7, Jardim Alvorada"
+          className="mt-1 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-950 focus:border-slate-950 focus:outline-none"
+        />
+        <p className="mt-1 text-xs text-slate-500">
+          Separe por vírgula ou linha (até 15). Cada bairro vira uma busca própria e encontra empresas que a
+          busca só pela cidade não alcança.
+        </p>
+      </div>
+
+      <div>
         <label htmlFor="limite" className="text-xs font-black uppercase tracking-[0.2em] text-slate-400">
-          Limite de resultados
+          Limite de resultados (por bairro, se informar)
         </label>
         <input
           id="limite"

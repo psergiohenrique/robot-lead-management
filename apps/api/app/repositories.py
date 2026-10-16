@@ -1,11 +1,37 @@
 from __future__ import annotations
 
+import time
 from typing import Any
+
+from psycopg.types.json import Json
 
 from app.config import get_settings
 from app.db import database_configured, get_connection
 from app.importer import normalizar_status_contato
-from app.places import buscar_lugares, montar_lead
+from app.places import (
+    PRESENCA_SO_REDE_SOCIAL,
+    WHATSAPP_STATUS_PRESERVADOS,
+    buscar_lugares,
+    classificar_presenca_web,
+    montar_lead,
+    pontuar,
+    regex_sql_dominios_nao_site,
+    resolver_score_config,
+    whatsapp_apos_status_contato,
+)
+
+ORCAMENTO_BUSCA_SEGUNDOS = 40
+MAXIMO_BAIRROS_POR_BUSCA = 15
+_SCHEMA_CAMPANHAS_PRONTO = False
+
+
+def _filtro_lead_ativo(alias: str = "") -> str:
+    """Esconde empresas fechadas definitivamente que nunca foram trabalhadas."""
+    prefixo = f"{alias}." if alias else ""
+    return (
+        f"NOT (COALESCE({prefixo}business_status, '') = 'CLOSED_PERMANENTLY' "
+        f"AND COALESCE({prefixo}status_contato, 'Novo') = 'Novo')"
+    )
 
 
 def ensure_search_batch_leads_table() -> None:
@@ -33,8 +59,39 @@ def ensure_search_batch_leads_table() -> None:
         connection.commit()
 
 
+def _aplicar_colunas_qualidade(cursor: Any) -> None:
+    cursor.execute("ALTER TABLE leads ADD COLUMN IF NOT EXISTS tipo_presenca_web TEXT")
+    cursor.execute("ALTER TABLE search_batch_items ADD COLUMN IF NOT EXISTS regiao TEXT")
+    cursor.execute("ALTER TABLE campaigns ADD COLUMN IF NOT EXISTS score_config JSONB")
+    cursor.execute("CREATE INDEX IF NOT EXISTS idx_leads_user_telefone ON leads (user_id, telefone_limpo)")
+    cursor.execute(
+        """
+        WITH calculado AS (
+            SELECT id,
+                CASE
+                    WHEN COALESCE(btrim(site_cadastrado), '') = '' THEN 'Sem site'
+                    WHEN site_cadastrado ~* %(dominios)s THEN 'Só rede social'
+                    ELSE 'Site próprio'
+                END AS tipo
+            FROM leads
+            WHERE tipo_presenca_web IS NULL
+        )
+        UPDATE leads l
+        SET tipo_presenca_web = calculado.tipo,
+            sem_site_cadastrado = CASE
+                WHEN calculado.tipo = 'Só rede social' THEN 'SIM'
+                ELSE l.sem_site_cadastrado
+            END
+        FROM calculado
+        WHERE l.id = calculado.id
+        """,
+        {"dominios": regex_sql_dominios_nao_site()},
+    )
+
+
 def ensure_campaigns_table() -> None:
-    if not database_configured():
+    global _SCHEMA_CAMPANHAS_PRONTO
+    if not database_configured() or _SCHEMA_CAMPANHAS_PRONTO:
         return
 
     with get_connection() as connection:
@@ -63,7 +120,9 @@ def ensure_campaigns_table() -> None:
             cursor.execute(
                 "CREATE INDEX IF NOT EXISTS idx_search_batches_campaign_id ON search_batches (campaign_id)"
             )
+            _aplicar_colunas_qualidade(cursor)
         connection.commit()
+    _SCHEMA_CAMPANHAS_PRONTO = True
 
 
 def ensure_lead_activities_table() -> None:
@@ -185,6 +244,19 @@ def _normalizar_lead_saida(lead: dict[str, Any]) -> dict[str, Any]:
     return lead
 
 
+def _normalizar_campanha(row: dict[str, Any]) -> dict[str, Any]:
+    campaign = dict(row)
+    campaign["score_config"] = resolver_score_config(campaign.get("score_config"))
+    return campaign
+
+
+def _score_config_para_salvar(payload: dict[str, Any]) -> Json | None:
+    bruto = payload.get("score_config")
+    if not isinstance(bruto, dict):
+        return None
+    return Json(resolver_score_config(bruto))
+
+
 def create_campaign(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
     if not database_configured():
         raise RuntimeError("DATABASE_URL não configurada.")
@@ -198,6 +270,7 @@ def create_campaign(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
         "criterio_principal": payload.get("criterio_principal") or "Empresas sem site cadastrado no Google",
         "canal": payload.get("canal") or "WhatsApp manual",
         "status": payload.get("status") or "Ativa",
+        "score_config": _score_config_para_salvar(payload),
     }
 
     with get_connection() as connection:
@@ -205,16 +278,16 @@ def create_campaign(user_id: int, payload: dict[str, Any]) -> dict[str, Any]:
             cursor.execute(
                 """
                 INSERT INTO campaigns (
-                    user_id, nome, objetivo, oferta_principal, criterio_principal, canal, status
+                    user_id, nome, objetivo, oferta_principal, criterio_principal, canal, status, score_config
                 ) VALUES (
                     %(user_id)s, %(nome)s, %(objetivo)s, %(oferta_principal)s,
-                    %(criterio_principal)s, %(canal)s, %(status)s
+                    %(criterio_principal)s, %(canal)s, %(status)s, %(score_config)s
                 )
                 RETURNING *
                 """,
                 values,
             )
-            campaign = dict(cursor.fetchone())
+            campaign = _normalizar_campanha(cursor.fetchone())
         connection.commit()
     return campaign
 
@@ -233,6 +306,7 @@ def update_campaign(campaign_id: int, user_id: int, payload: dict[str, Any]) -> 
         "criterio_principal": payload.get("criterio_principal") or None,
         "canal": payload.get("canal") or "WhatsApp manual",
         "status": payload.get("status") or "Ativa",
+        "score_config": _score_config_para_salvar(payload),
     }
 
     with get_connection() as connection:
@@ -246,6 +320,7 @@ def update_campaign(campaign_id: int, user_id: int, payload: dict[str, Any]) -> 
                     criterio_principal = %(criterio_principal)s,
                     canal = %(canal)s,
                     status = %(status)s,
+                    score_config = COALESCE(%(score_config)s::jsonb, score_config),
                     updated_at = now()
                 WHERE id = %(id)s
                   AND user_id = %(user_id)s
@@ -256,7 +331,7 @@ def update_campaign(campaign_id: int, user_id: int, payload: dict[str, Any]) -> 
             row = cursor.fetchone()
         connection.commit()
 
-    return dict(row) if row else None
+    return _normalizar_campanha(row) if row else None
 
 
 def get_or_create_default_campaign(user_id: int) -> dict[str, Any]:
@@ -276,7 +351,7 @@ def get_or_create_default_campaign(user_id: int) -> dict[str, Any]:
             )
             row = cursor.fetchone()
             if row:
-                campaign = dict(row)
+                campaign = _normalizar_campanha(row)
                 cursor.execute(
                     """
                     UPDATE search_batches
@@ -306,7 +381,7 @@ def get_or_create_default_campaign(user_id: int) -> dict[str, Any]:
                 """,
                 {"user_id": user_id},
             )
-            campaign = dict(cursor.fetchone())
+            campaign = _normalizar_campanha(cursor.fetchone())
             cursor.execute(
                 """
                 UPDATE search_batches
@@ -332,7 +407,7 @@ def get_campaign(campaign_id: int, user_id: int) -> dict[str, Any] | None:
                 {"id": campaign_id, "user_id": user_id},
             )
             row = cursor.fetchone()
-            return dict(row) if row else None
+            return _normalizar_campanha(row) if row else None
 
 
 def list_campaigns(user_id: int) -> list[dict[str, Any]]:
@@ -362,7 +437,7 @@ def list_campaigns(user_id: int) -> list[dict[str, Any]]:
                 """,
                 {"user_id": user_id},
             )
-            return [dict(row) for row in cursor.fetchall()]
+            return [_normalizar_campanha(row) for row in cursor.fetchall()]
 
 
 def get_dashboard_summary(user_id: int) -> dict[str, int]:
@@ -391,12 +466,14 @@ def get_dashboard_summary(user_id: int) -> dict[str, int]:
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
-                """
+                f"""
                 SELECT
                     COUNT(*)::int AS total_leads,
                     COUNT(*) FILTER (WHERE sem_site_cadastrado = 'SIM')::int AS leads_sem_site,
                     COUNT(*) FILTER (WHERE classificacao_lead = 'Quente')::int AS leads_quentes,
-                    COUNT(*) FILTER (WHERE whatsapp_status = 'Provável WhatsApp')::int AS provavel_whatsapp,
+                    COUNT(*) FILTER (
+                        WHERE whatsapp_status IN ('Provável WhatsApp', 'WhatsApp confirmado')
+                    )::int AS provavel_whatsapp,
                     COUNT(*) FILTER (
                         WHERE COALESCE(status_contato, 'Novo') = 'Novo'
                     )::int AS status_novo,
@@ -443,6 +520,7 @@ def get_dashboard_summary(user_id: int) -> dict[str, int]:
                     COUNT(*) FILTER (WHERE fechado = true)::int AS fechados
                 FROM leads
                 WHERE user_id = %(user_id)s
+                  AND {_filtro_lead_ativo()}
                 """,
                 {"user_id": user_id},
             )
@@ -655,14 +733,14 @@ def list_leads(
     if not database_configured():
         return [], 0
 
+    ensure_campaigns_table()
     if batch_id:
         ensure_search_batch_leads_table()
     if campaign_id:
-        ensure_campaigns_table()
         ensure_search_batch_leads_table()
     ensure_lead_activities_table()
 
-    filters: list[str] = ["l.user_id = %(user_id)s"]
+    filters: list[str] = ["l.user_id = %(user_id)s", _filtro_lead_ativo("l")]
     params: dict[str, Any] = {"limit": limit, "offset": offset, "user_id": user_id}
 
     if cidade:
@@ -738,6 +816,7 @@ def list_leads(
                     l.id, l.place_id, l.nome, l.telefone, l.telefone_limpo, l.whatsapp_status,
                     l.endereco, l.cidade, l.segmento, l.regiao, l.google_maps_url, l.avaliacao,
                     l.quantidade_avaliacoes, l.site_cadastrado, l.sem_site_cadastrado,
+                    l.tipo_presenca_web, l.business_status,
                     l.score_oportunidade, l.classificacao_lead, l.prioridade,
                     l.status_contato, l.data_primeiro_contato, l.data_ultimo_contato,
                     l.proximo_followup, l.updated_at,
@@ -840,6 +919,15 @@ def update_lead_contact(lead_id: int, user_id: int, payload: dict[str, Any]) -> 
                         status_anterior=previous_status,
                         status_novo=new_status,
                     )
+                    novo_whatsapp = whatsapp_apos_status_contato(
+                        new_status, updated.get("telefone_limpo"), updated.get("whatsapp_status")
+                    )
+                    if novo_whatsapp:
+                        cursor.execute(
+                            "UPDATE leads SET whatsapp_status = %(whatsapp_status)s WHERE id = %(lead_id)s AND user_id = %(user_id)s",
+                            {"whatsapp_status": novo_whatsapp, "lead_id": lead_id, "user_id": user_id},
+                        )
+                        updated["whatsapp_status"] = novo_whatsapp
                 if "proximo_followup" in values and str(previous_followup or "") != str(updated.get("proximo_followup") or ""):
                     _registrar_atividade(
                         cursor,
@@ -887,18 +975,74 @@ def get_lead(lead_id: int, user_id: int) -> dict[str, Any] | None:
             return lead
 
 
-def _marcar_erro(batch_id: int, item_id: int, erro: str) -> None:
+def _marcar_item(item_id: int, status: str, erro: str | None = None) -> None:
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                "UPDATE search_batch_items SET status = %(status)s, erro = %(erro)s, finished_at = now() WHERE id = %(id)s",
+                {"status": status, "erro": erro, "id": item_id},
+            )
+        connection.commit()
+
+
+def _marcar_lote_com_erro(batch_id: int, erro: str) -> None:
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
                 "UPDATE search_batches SET status = 'error', erro = %(erro)s, finished_at = now() WHERE id = %(id)s",
                 {"erro": erro, "id": batch_id},
             )
-            cursor.execute(
-                "UPDATE search_batch_items SET status = 'error', erro = %(erro)s, finished_at = now() WHERE id = %(id)s",
-                {"erro": erro, "id": item_id},
-            )
         connection.commit()
+
+
+def _limpar_bairros(bairros: list[str] | None) -> list[str]:
+    limpos: dict[str, str] = {}
+    for bairro in bairros or []:
+        texto = " ".join(str(bairro).split())[:80]
+        if texto:
+            limpos.setdefault(texto.casefold(), texto)
+    return list(limpos.values())[:MAXIMO_BAIRROS_POR_BUSCA]
+
+
+def _remover_duplicados_por_telefone(
+    cursor: Any, user_id: int, leads: list[dict[str, Any]]
+) -> tuple[list[dict[str, Any]], int]:
+    """Descarta empresas novas cujo telefone já pertence a outro lead (filiais, franquias, cadastros repetidos)."""
+    place_ids = [lead["place_id"] for lead in leads]
+    telefones = sorted({lead["telefone_limpo"] for lead in leads if lead["telefone_limpo"]})
+    place_ids_existentes: set[str] = set()
+    donos_do_telefone: dict[str, set[str]] = {}
+    if telefones:
+        cursor.execute(
+            """
+            SELECT place_id, telefone_limpo
+            FROM leads
+            WHERE user_id = %(user_id)s
+              AND (place_id = ANY(%(place_ids)s) OR telefone_limpo = ANY(%(telefones)s))
+            """,
+            {"user_id": user_id, "place_ids": place_ids, "telefones": telefones},
+        )
+        for row in cursor.fetchall():
+            if row["place_id"] in place_ids:
+                place_ids_existentes.add(row["place_id"])
+            if row["telefone_limpo"]:
+                donos_do_telefone.setdefault(row["telefone_limpo"], set()).add(row["place_id"])
+
+    mantidos: list[dict[str, Any]] = []
+    telefone_no_lote: dict[str, str] = {}
+    duplicados = 0
+    for lead in sorted(leads, key=lambda item: -(item["score_oportunidade"] or 0)):
+        telefone = lead["telefone_limpo"]
+        if telefone and lead["place_id"] not in place_ids_existentes:
+            outro_dono = any(pid != lead["place_id"] for pid in donos_do_telefone.get(telefone, set()))
+            repetido_no_lote = telefone_no_lote.get(telefone, lead["place_id"]) != lead["place_id"]
+            if outro_dono or repetido_no_lote:
+                duplicados += 1
+                continue
+        if telefone:
+            telefone_no_lote.setdefault(telefone, lead["place_id"])
+        mantidos.append(lead)
+    return mantidos, duplicados
 
 
 def criar_e_executar_lote(
@@ -910,6 +1054,7 @@ def criar_e_executar_lote(
     limite: int,
     nome_lote: str | None,
     campaign_id: int | None = None,
+    bairros: list[str] | None = None,
 ) -> dict[str, Any]:
     if not database_configured():
         raise RuntimeError("DATABASE_URL não configurada.")
@@ -919,12 +1064,22 @@ def criar_e_executar_lote(
     if not api_key:
         raise RuntimeError("GOOGLE_PLACES_API_KEY não configurada.")
 
-    query_base = f"{segmento} em {cidade}"
+    ensure_campaigns_table()
+    ensure_search_batch_leads_table()
+
+    regioes: list[str | None] = list(_limpar_bairros(bairros)) or [None]
+    buscas = [
+        (regiao, f"{segmento} em {regiao}, {cidade}" if regiao else f"{segmento} em {cidade}")
+        for regiao in regioes
+    ]
+
     campaign = get_campaign(campaign_id, user_id) if campaign_id else get_or_create_default_campaign(user_id)
     if campaign_id and not campaign:
         raise RuntimeError("Campanha não encontrada para este usuário.")
     final_campaign_id = campaign["id"]
+    score_config = campaign["score_config"]
 
+    item_ids: list[int] = []
     with get_connection() as connection:
         with connection.cursor() as cursor:
             cursor.execute(
@@ -934,7 +1089,7 @@ def criar_e_executar_lote(
                 )
                 VALUES (
                     %(user_id)s, %(campaign_id)s, %(nome_lote)s, 'running',
-                    %(prioridade)s, %(limite)s, now()
+                    %(prioridade)s, %(total_planejado)s, now()
                 )
                 RETURNING id
                 """,
@@ -943,80 +1098,136 @@ def criar_e_executar_lote(
                     "campaign_id": final_campaign_id,
                     "nome_lote": nome_lote,
                     "prioridade": prioridade,
-                    "limite": limite,
+                    "total_planejado": limite * len(buscas),
                 },
             )
             batch_id = cursor.fetchone()["id"]
-            cursor.execute(
-                """
-                INSERT INTO search_batch_items (batch_id, cidade, segmento, limite, query_base, status)
-                VALUES (%(batch_id)s, %(cidade)s, %(segmento)s, %(limite)s, %(query_base)s, 'running')
-                RETURNING id
-                """,
-                {
-                    "batch_id": batch_id,
-                    "cidade": cidade,
-                    "segmento": segmento,
-                    "limite": limite,
-                    "query_base": query_base,
-                },
-            )
-            item_id = cursor.fetchone()["id"]
+            for regiao, query in buscas:
+                cursor.execute(
+                    """
+                    INSERT INTO search_batch_items (batch_id, cidade, segmento, regiao, limite, query_base, status)
+                    VALUES (%(batch_id)s, %(cidade)s, %(segmento)s, %(regiao)s, %(limite)s, %(query_base)s, 'running')
+                    RETURNING id
+                    """,
+                    {
+                        "batch_id": batch_id,
+                        "cidade": cidade,
+                        "segmento": segmento,
+                        "regiao": regiao,
+                        "limite": limite,
+                        "query_base": query,
+                    },
+                )
+                item_ids.append(cursor.fetchone()["id"])
         connection.commit()
 
-    try:
-        lugares = buscar_lugares(api_key, query_base, limite)
-    except RuntimeError as erro:
-        _marcar_erro(batch_id, item_id, str(erro))
-        raise
+    inicio = time.monotonic()
+    encontrados: list[tuple[str | None, dict[str, Any]]] = []
+    place_ids_vistos: set[str] = set()
+    erros: list[str] = []
+    buscas_executadas = 0
+    buscas_puladas = 0
 
-    leads = [
-        {**montar_lead(lugar, cidade=cidade, segmento=segmento, prioridade=prioridade), "user_id": user_id}
-        for lugar in lugares
-        if lugar.get("id")
-    ]
+    for (regiao, query), item_id in zip(buscas, item_ids):
+        if buscas_executadas and time.monotonic() - inicio > ORCAMENTO_BUSCA_SEGUNDOS:
+            _marcar_item(item_id, "skipped", "Não executado: tempo máximo da busca esgotado.")
+            buscas_puladas += 1
+            continue
+        try:
+            lugares = buscar_lugares(api_key, query, limite)
+        except RuntimeError as erro:
+            _marcar_item(item_id, "error", str(erro))
+            erros.append(str(erro))
+            continue
+        _marcar_item(item_id, "done")
+        buscas_executadas += 1
+        for lugar in lugares:
+            place_id = lugar.get("id")
+            if place_id and place_id not in place_ids_vistos:
+                place_ids_vistos.add(place_id)
+                encontrados.append((regiao, lugar))
+
+    if not buscas_executadas:
+        mensagem_erro = erros[0] if erros else "Nenhuma busca foi executada."
+        _marcar_lote_com_erro(batch_id, mensagem_erro)
+        raise RuntimeError(mensagem_erro)
+
+    leads: list[dict[str, Any]] = []
+    fechadas: list[str] = []
+    for regiao, lugar in encontrados:
+        lead = montar_lead(
+            lugar,
+            cidade=cidade,
+            segmento=segmento,
+            prioridade=prioridade,
+            regiao=regiao,
+            score_config=score_config,
+        )
+        if lead["business_status"] == "CLOSED_PERMANENTLY":
+            fechadas.append(lead["place_id"])
+            continue
+        leads.append({**lead, "user_id": user_id})
 
     novos = 0
     atualizados = 0
-    sem_site = sum(1 for lead in leads if lead["sem_site_cadastrado"] == "SIM")
-    ensure_search_batch_leads_table()
 
     with get_connection() as connection:
         with connection.cursor() as cursor:
+            if fechadas:
+                cursor.execute(
+                    """
+                    UPDATE leads
+                    SET business_status = 'CLOSED_PERMANENTLY', updated_at = now()
+                    WHERE user_id = %(user_id)s AND place_id = ANY(%(place_ids)s)
+                    """,
+                    {"user_id": user_id, "place_ids": fechadas},
+                )
+
+            leads, duplicados = _remover_duplicados_por_telefone(cursor, user_id, leads)
+            sem_site = sum(1 for lead in leads if lead["sem_site_cadastrado"] == "SIM")
+            so_rede_social = sum(1 for lead in leads if lead["tipo_presenca_web"] == PRESENCA_SO_REDE_SOCIAL)
+
             for lead in leads:
                 cursor.execute(
                     """
                     INSERT INTO leads (
                         user_id, place_id, nome, telefone, telefone_limpo, whatsapp_status,
-                        endereco, cidade, segmento, google_maps_url, avaliacao,
-                        quantidade_avaliacoes, site_cadastrado, sem_site_cadastrado,
+                        endereco, cidade, segmento, regiao, google_maps_url, avaliacao,
+                        quantidade_avaliacoes, site_cadastrado, sem_site_cadastrado, tipo_presenca_web,
                         business_status, score_oportunidade, classificacao_lead, prioridade
                     ) VALUES (
                         %(user_id)s, %(place_id)s, %(nome)s, %(telefone)s, %(telefone_limpo)s, %(whatsapp_status)s,
-                        %(endereco)s, %(cidade)s, %(segmento)s, %(google_maps_url)s, %(avaliacao)s,
-                        %(quantidade_avaliacoes)s, %(site_cadastrado)s, %(sem_site_cadastrado)s,
+                        %(endereco)s, %(cidade)s, %(segmento)s, %(regiao)s, %(google_maps_url)s, %(avaliacao)s,
+                        %(quantidade_avaliacoes)s, %(site_cadastrado)s, %(sem_site_cadastrado)s, %(tipo_presenca_web)s,
                         %(business_status)s, %(score_oportunidade)s, %(classificacao_lead)s, %(prioridade)s
                     )
                     ON CONFLICT (user_id, place_id) DO UPDATE SET
                         nome = EXCLUDED.nome,
                         telefone = EXCLUDED.telefone,
                         telefone_limpo = EXCLUDED.telefone_limpo,
-                        whatsapp_status = EXCLUDED.whatsapp_status,
+                        whatsapp_status = CASE
+                            WHEN leads.whatsapp_status = ANY(%(whatsapp_preservados)s)
+                                AND leads.telefone_limpo IS NOT DISTINCT FROM EXCLUDED.telefone_limpo
+                            THEN leads.whatsapp_status
+                            ELSE EXCLUDED.whatsapp_status
+                        END,
                         endereco = EXCLUDED.endereco,
                         cidade = EXCLUDED.cidade,
                         segmento = EXCLUDED.segmento,
+                        regiao = COALESCE(EXCLUDED.regiao, leads.regiao),
                         google_maps_url = EXCLUDED.google_maps_url,
                         avaliacao = EXCLUDED.avaliacao,
                         quantidade_avaliacoes = EXCLUDED.quantidade_avaliacoes,
                         site_cadastrado = EXCLUDED.site_cadastrado,
                         sem_site_cadastrado = EXCLUDED.sem_site_cadastrado,
+                        tipo_presenca_web = EXCLUDED.tipo_presenca_web,
                         business_status = EXCLUDED.business_status,
                         score_oportunidade = EXCLUDED.score_oportunidade,
                         classificacao_lead = EXCLUDED.classificacao_lead,
                         updated_at = now()
                     RETURNING id, (xmax = 0) AS inserted
                     """,
-                    lead,
+                    {**lead, "whatsapp_preservados": list(WHATSAPP_STATUS_PRESERVADOS)},
                 )
                 row = cursor.fetchone()
                 if row and row["inserted"]:
@@ -1033,30 +1244,111 @@ def criar_e_executar_lote(
                         {"batch_id": batch_id, "lead_id": row["id"]},
                     )
 
+            observacoes: list[str] = []
+            if buscas_puladas:
+                observacoes.append(f"{buscas_puladas} bairro(s) não executado(s) por limite de tempo")
+            if erros:
+                observacoes.append(f"{len(erros)} busca(s) com erro: {erros[0]}")
             cursor.execute(
                 """
                 UPDATE search_batches
                 SET status = 'done', total_processado = %(total)s, total_leads = %(total)s,
-                    total_sem_site = %(sem_site)s, finished_at = now()
+                    total_sem_site = %(sem_site)s, erro = %(erro)s, finished_at = now()
                 WHERE id = %(batch_id)s
                 """,
-                {"total": len(leads), "sem_site": sem_site, "batch_id": batch_id},
-            )
-            cursor.execute(
-                "UPDATE search_batch_items SET status = 'done', finished_at = now() WHERE id = %(item_id)s",
-                {"item_id": item_id},
+                {
+                    "total": len(leads),
+                    "sem_site": sem_site,
+                    "erro": "; ".join(observacoes) or None,
+                    "batch_id": batch_id,
+                },
             )
         connection.commit()
+
+    partes = [f"{len(leads)} empresa(s) encontrada(s), {sem_site} sem site próprio"]
+    if so_rede_social:
+        partes[0] += f" ({so_rede_social} só com rede social)"
+    if len(buscas) > 1:
+        partes.append(f"{buscas_executadas} de {len(buscas)} bairro(s) buscado(s)")
+    if fechadas:
+        partes.append(f"{len(fechadas)} fechada(s) definitivamente ignorada(s)")
+    if duplicados:
+        partes.append(f"{duplicados} duplicada(s) por telefone ignorada(s)")
+    if buscas_puladas:
+        partes.append(f"{buscas_puladas} bairro(s) ficaram de fora por tempo — rode de novo só com eles")
+    if erros:
+        partes.append(f"{len(erros)} bairro(s) com erro na API do Google")
 
     return {
         "id": batch_id,
         "status": "done",
         "total_encontrado": len(leads),
         "total_sem_site": sem_site,
+        "total_so_rede_social": so_rede_social,
         "novos_leads": novos,
         "leads_atualizados": atualizados,
-        "message": f"{len(leads)} empresa(s) encontrada(s), {sem_site} sem site cadastrado.",
+        "descartados_fechados": len(fechadas),
+        "duplicados": duplicados,
+        "buscas_executadas": buscas_executadas,
+        "buscas_puladas": buscas_puladas,
+        "message": "; ".join(partes) + ".",
     }
+
+
+def recalcular_score_campanha(campaign_id: int, user_id: int) -> int | None:
+    """Reaplica a configuração de score da campanha aos leads que vieram das buscas dela."""
+    if not database_configured():
+        raise RuntimeError("DATABASE_URL não configurada.")
+
+    ensure_campaigns_table()
+    ensure_search_batch_leads_table()
+    campaign = get_campaign(campaign_id, user_id)
+    if not campaign:
+        return None
+    config = campaign["score_config"]
+
+    with get_connection() as connection:
+        with connection.cursor() as cursor:
+            cursor.execute(
+                """
+                SELECT DISTINCT
+                    l.id, l.site_cadastrado, l.tipo_presenca_web, l.avaliacao, l.quantidade_avaliacoes,
+                    l.telefone, l.whatsapp_status, l.prioridade, l.segmento, l.cidade, l.business_status
+                FROM leads l
+                JOIN search_batch_leads sbl ON sbl.lead_id = l.id
+                JOIN search_batches sb ON sb.id = sbl.batch_id
+                WHERE sb.campaign_id = %(campaign_id)s
+                  AND sb.user_id = %(user_id)s
+                  AND l.user_id = %(user_id)s
+                """,
+                {"campaign_id": campaign_id, "user_id": user_id},
+            )
+            atualizacoes = []
+            for lead in cursor.fetchall():
+                score, classificacao = pontuar(
+                    presenca_web=lead["tipo_presenca_web"] or classificar_presenca_web(lead["site_cadastrado"]),
+                    avaliacao=float(lead["avaliacao"] or 0),
+                    quantidade_avaliacoes=int(lead["quantidade_avaliacoes"] or 0),
+                    telefone=lead["telefone"],
+                    whatsapp_status=lead["whatsapp_status"],
+                    prioridade=lead["prioridade"],
+                    segmento=lead["segmento"],
+                    cidade=lead["cidade"],
+                    business_status=lead["business_status"],
+                    config=config,
+                )
+                atualizacoes.append({"id": lead["id"], "score": score, "classificacao": classificacao})
+            if atualizacoes:
+                cursor.executemany(
+                    """
+                    UPDATE leads
+                    SET score_oportunidade = %(score)s, classificacao_lead = %(classificacao)s, updated_at = now()
+                    WHERE id = %(id)s
+                    """,
+                    atualizacoes,
+                )
+        connection.commit()
+    return len(atualizacoes)
 
 
 def list_search_batches(user_id: int, limit: int = 20, campaign_id: int | None = None) -> list[dict[str, Any]]:
@@ -1154,6 +1446,8 @@ def importar_leads_planilha(
                     "quantidade_avaliacoes": lead.get("quantidade_avaliacoes"),
                     "site_cadastrado": lead.get("site_cadastrado"),
                     "sem_site_cadastrado": lead.get("sem_site_cadastrado"),
+                    "tipo_presenca_web": lead.get("tipo_presenca_web"),
+                    "whatsapp_preservados": list(WHATSAPP_STATUS_PRESERVADOS),
                     "business_status": lead.get("business_status"),
                     "score_oportunidade": lead.get("score_oportunidade"),
                     "classificacao_lead": lead.get("classificacao_lead"),
@@ -1185,7 +1479,7 @@ def importar_leads_planilha(
                     INSERT INTO leads (
                         user_id, place_id, nome, telefone, telefone_limpo, whatsapp_status,
                         endereco, cidade, segmento, regiao, google_maps_url, avaliacao,
-                        quantidade_avaliacoes, site_cadastrado, sem_site_cadastrado,
+                        quantidade_avaliacoes, site_cadastrado, sem_site_cadastrado, tipo_presenca_web,
                         business_status, score_oportunidade, classificacao_lead, prioridade,
                         oferta_principal, observacao_comercial, status_contato,
                         data_primeiro_contato, data_ultimo_contato, proximo_followup,
@@ -1194,7 +1488,7 @@ def importar_leads_planilha(
                     ) VALUES (
                         %(user_id)s, %(place_id)s, %(nome)s, %(telefone)s, %(telefone_limpo)s, %(whatsapp_status)s,
                         %(endereco)s, %(cidade)s, %(segmento)s, %(regiao)s, %(google_maps_url)s, %(avaliacao)s,
-                        %(quantidade_avaliacoes)s, %(site_cadastrado)s, %(sem_site_cadastrado)s,
+                        %(quantidade_avaliacoes)s, %(site_cadastrado)s, %(sem_site_cadastrado)s, %(tipo_presenca_web)s,
                         %(business_status)s, %(score_oportunidade)s, %(classificacao_lead)s, %(prioridade)s,
                         %(oferta_principal)s, %(observacao_comercial)s, %(status_contato)s,
                         %(data_primeiro_contato)s, %(data_ultimo_contato)s, %(proximo_followup)s,
@@ -1205,7 +1499,12 @@ def importar_leads_planilha(
                         nome = EXCLUDED.nome,
                         telefone = COALESCE(EXCLUDED.telefone, leads.telefone),
                         telefone_limpo = COALESCE(EXCLUDED.telefone_limpo, leads.telefone_limpo),
-                        whatsapp_status = COALESCE(EXCLUDED.whatsapp_status, leads.whatsapp_status),
+                        whatsapp_status = CASE
+                            WHEN leads.whatsapp_status = ANY(%(whatsapp_preservados)s)
+                                AND leads.telefone_limpo IS NOT DISTINCT FROM COALESCE(EXCLUDED.telefone_limpo, leads.telefone_limpo)
+                            THEN leads.whatsapp_status
+                            ELSE COALESCE(EXCLUDED.whatsapp_status, leads.whatsapp_status)
+                        END,
                         endereco = COALESCE(EXCLUDED.endereco, leads.endereco),
                         cidade = COALESCE(EXCLUDED.cidade, leads.cidade),
                         segmento = COALESCE(EXCLUDED.segmento, leads.segmento),
@@ -1215,6 +1514,7 @@ def importar_leads_planilha(
                         quantidade_avaliacoes = COALESCE(EXCLUDED.quantidade_avaliacoes, leads.quantidade_avaliacoes),
                         site_cadastrado = COALESCE(EXCLUDED.site_cadastrado, leads.site_cadastrado),
                         sem_site_cadastrado = COALESCE(EXCLUDED.sem_site_cadastrado, leads.sem_site_cadastrado),
+                        tipo_presenca_web = COALESCE(EXCLUDED.tipo_presenca_web, leads.tipo_presenca_web),
                         business_status = COALESCE(EXCLUDED.business_status, leads.business_status),
                         score_oportunidade = COALESCE(EXCLUDED.score_oportunidade, leads.score_oportunidade),
                         classificacao_lead = COALESCE(EXCLUDED.classificacao_lead, leads.classificacao_lead),

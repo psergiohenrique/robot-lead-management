@@ -81,7 +81,8 @@ function leadPriority(lead: Lead): number {
   const status = normalizeStatus(lead.status_contato);
   const score = lead.score_oportunidade ?? 0;
   const reviews = lead.quantidade_avaliacoes ?? 0;
-  const whatsapp = lead.whatsapp_status === "Provável WhatsApp" ? 30 : 0;
+  const whatsapp =
+    lead.whatsapp_status === "WhatsApp confirmado" ? 35 : lead.whatsapp_status === "Provável WhatsApp" ? 30 : 0;
   const hot = lead.classificacao_lead === "Quente" ? 40 : lead.classificacao_lead === "Morno" ? 15 : 0;
   const statusWeight = status === "Respondeu" ? 60 : status === "Proposta" ? 55 : status === "Novo" ? 35 : 20;
   return statusWeight + hot + whatsapp + score * 5 + Math.min(reviews, 250) / 10;
